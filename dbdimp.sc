@@ -1,5 +1,5 @@
 /*
- * $Id: dbdimp.sc,v 2.100 1997/09/10 08:00:41 ht000 Exp ht000 $
+ * $Id: dbdimp.sc,v 2.101 1997/09/11 07:42:45 ht000 Exp $
  *
  * Copyright (c) 1994,1995  Tim Bunce
  *           (c) 1996,1997  Henrik Tougaard
@@ -22,6 +22,42 @@ EXEC SQL INCLUDE 'Ingres.sh';
 DBISTATE_DECLARE;
 static int cur_session;    /* the 'current' Ingres session_id */
 static int nxt_session;    /* the next 'available' session_id */
+
+static void dump_sqlda(sqlda)
+    IISQLDA* sqlda;
+{
+    int i;
+    if (dbis->debug < 3) return;
+    fprintf(DBILOGFP, "Dump of sqlda:\n");
+    fprintf(DBILOGFP, "  id: %c%c%c%c%c%c%c%c\n",
+        sqlda->sqldaid[0], sqlda->sqldaid[1], sqlda->sqldaid[2],
+        sqlda->sqldaid[3], sqlda->sqldaid[4], sqlda->sqldaid[5],
+        sqlda->sqldaid[6], sqlda->sqldaid[7]);
+    fprintf(DBILOGFP, "  bc: %d\n  sqln: %d, sqld: %d\n",
+        sqlda->sqldabc, sqlda->sqln, sqlda->sqld);
+    for (i=0; i<sqlda->sqld; ++i) {
+        IISQLVAR* var = &sqlda->sqlvar[i];
+        fprintf(DBILOGFP, "  sqlvar[%d]: type: %d, len: %d, ind: %d",
+            i, var->sqltype, var->sqllen, var->sqlind);
+        switch (var->sqltype) {
+        case IISQ_INT_TYPE: {
+            fprintf(DBILOGFP, ", var: %d\n",
+                *((int*)(var->sqldata)));
+            break;
+            }
+        case IISQ_FLT_TYPE: {
+            fprintf(DBILOGFP, ", var: %g\n",
+                *((double*)(var->sqldata)));
+            break;
+            }
+        case IISQ_CHA_TYPE: {
+            fprintf(DBILOGFP, ", var: '%s'\n",
+                var->sqldata);
+            break;
+            }
+        }
+    }
+}
 
 int
 sql_check(h)
@@ -412,6 +448,8 @@ dbd_st_prepare(sth, statement, attribs)
 
     imp_sth->done_desc = 0;
     sqlda = &imp_sth->sqlda;
+    strcpy(sqlda->sqldaid, "SQLDA   ");
+    sqlda->sqldabc = sizeof(IISQLDA);
     sqlda->sqln = IISQ_MAX_COLS;
     name = imp_sth->name = generate_statement_name(&imp_sth->st_num);
     
@@ -451,6 +489,13 @@ dbd_st_prepare(sth, statement, attribs)
 	    ++src;
         }
     }
+    if (DBIc_NUM_PARAMS(imp_sth) > 1) {
+        IISQLDA *sqlda = &imp_sth->ph_sqlda;
+        strcpy(sqlda->sqldaid, "SQLDA   ");
+        sqlda->sqldabc = sizeof(IISQLDA);
+        sqlda->sqln = IISQ_MAX_COLS;
+    }
+
     if (dbis->debug >= 2)
         printf("DBD::Ingres::dbd_st_prepare: fields: %d, phs: %d\n",
                 DBIc_NUM_FIELDS(imp_sth), DBIc_NUM_PARAMS(imp_sth));
@@ -556,6 +601,7 @@ dbd_describe(h, imp_sth)
     return 1;
 }
 
+
 int
 dbd_bind_ph (sth, imp_sth, param, value, sql_type, attribs, is_inout, maxlen)
     SV *sth;
@@ -576,6 +622,10 @@ dbd_bind_ph (sth, imp_sth, param, value, sql_type, attribs, is_inout, maxlen)
     } else {
 	croak("bind_param: parameter not a number");
     }
+
+    if (dbis->debug >= 2)
+        fprintf(DBILOGFP, "DBD::Ingres::dbd_bind_ph(%d)\n",
+            param_no);
 
     if (param_no < 1 || param_no > DBIc_NUM_PARAMS(imp_sth))
     	croak("Ingres(bind_param): parameter outside range 1..%d",
@@ -609,6 +659,8 @@ dbd_bind_ph (sth, imp_sth, param, value, sql_type, attribs, is_inout, maxlen)
     } else { /* char */
         type = 3;
     }
+    if (dbis->debug >= 3)
+        fprintf(DBILOGFP, "  type=%d\n", type);
     switch (type) {
     case 1: {/* int */
     	int* ptr;
@@ -632,9 +684,10 @@ dbd_bind_ph (sth, imp_sth, param, value, sql_type, attribs, is_inout, maxlen)
         var->sqlind = 0;
         var->sqldata = savepv(SvPV(value, na));
         var->sqllen = strlen(var->sqldata);
-        var->sqltype = IISQ_INT_TYPE;
+        var->sqltype = IISQ_CHA_TYPE;
         break; }
     }
+    if (dbis->debug >= 3) dump_sqlda(&imp_sth->ph_sqlda);
 }
 
 int

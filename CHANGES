@@ -1,3 +1,7 @@
+v0.05_91  1997.09.11
+    I just got the binding to work. I hope :)
+    Now only $dbh->rows is mucked up.
+
 v0.05_90  1997.09.10
     Major rehaul
     - added bind params - NOTE It doesn't work yet

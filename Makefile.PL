@@ -1,5 +1,5 @@
 #!/usr/local/bin/perl -sw
-# $Id: Makefile.PL,v 2.100 1997/09/10 08:00:41 ht000 Exp ht000 $
+# $Id: Makefile.PL,v 2.100 1997/09/10 08:00:41 ht000 Exp $
 
 require 5.003_93;
 
