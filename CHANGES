@@ -1,8 +1,12 @@
-$Id: //depot/tilpasninger/dbd-ingres/CHANGES#10 $ $DateTime: 2002/05/13 18:52:39 $ $Author: ht000 $
+$Id: //depot/tilpasninger/dbd-ingres/CHANGES#11 $ $DateTime: 2002/05/18 13:25:33 $ $Author: ht000 $
 
+v0.34       2002.05.18
+ -Setting $dbh->{AutoCommit}=1 trigers a commit as per the DBI specs.
 v0.33       2002.05.13
  -Bug in AutoCommit handling fixed. Previously Setting AutoCommit caused
-  a $dbh->Commit to be executed causing all kinds of grief.
+  a $dbh->Commit to be executed causing all kinds of grief. Eg setting
+  AutoCommit to  in the middle of a transaction triggered an absolutely
+  unwanted commit.
 v0.32       2002.03.06
  -Changes for perl5.7.3: all fprintf calls replaces by PerlIO_printf.
  -Bug in $sth->execute fixed. Sometimes errors were not detected.

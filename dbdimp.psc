@@ -1,5 +1,5 @@
 /*                               -*- Mode: C -*- 
- * $Id: //depot/tilpasninger/dbd-ingres/dbdimp.psc#7 $
+ * $Id: //depot/tilpasninger/dbd-ingres/dbdimp.psc#8 $
  *
  * Copyright (c) 1994,1995  Tim Bunce
  *           (c) 1996,1997  Henrik Tougaard
@@ -520,7 +520,7 @@ dbd_db_STORE_attrib(dbh, imp_dbh, keysv, valuesv)
 	PerlIO_printf(DBILOGFP,
 		      "DBD::Ingres::dbd_db_FETCH(TRANSACTION=%d)sqlca=%d\n",
 		      transaction_state, sqlca.sqlcode);
-      if (transaction_state == 0) {
+      if (transaction_state == 0 || on) {
 	EXEC SQL COMMIT;
       }
       if (dbis->debug >= 3)
