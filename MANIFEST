@@ -9,6 +9,7 @@ Makefile.PL
 MANIFEST
 t/dbi.t
 t/event.t
+t/exec.t
 README
 CHANGES
 

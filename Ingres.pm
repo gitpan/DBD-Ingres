@@ -34,7 +34,7 @@ DBD::Ingres - DBI driver for Ingres database systems
     use DynaLoader ();
     @ISA = qw(DynaLoader);
 
-    $VERSION = '0.31';
+    $VERSION = '0.32';
     my $Revision = substr(q$Change: 4536 $, 8)/100;
 
     bootstrap DBD::Ingres $VERSION;

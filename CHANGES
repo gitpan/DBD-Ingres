@@ -1,5 +1,10 @@
 $Id: //depot/tilpasninger/dbd-ingres/CHANGES#9 $ $DateTime: 2001/11/19 12:17:47 $ $Author: ht000 $
 
+v0.32       2002.03.06
+ -Changes for perl5.7.3: all fprintf calls replaces by PerlIO_printf.
+ -Bug in $sth->execute fixed. Sometimes errors were not detected.
+  Added a test for this. Thanks to Dirk Kraemer <kraemer@rz.uni-kiel.de>.
+ -Fixed Ingperl versionnumber so that CPAN is happier.
 v0.31       2001.09.17
  -To aid errorhandling dbh->{Statement} will contain the text of the SQL
   statement being executed during $dbh->do calls. This is an extension to

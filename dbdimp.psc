@@ -28,32 +28,32 @@ static void dump_sqlda(sqlda)
 {
     int i;
     if (dbis->debug < 3) return;
-    fprintf(DBILOGFP, "Dump of sqlda:\n");
-    fprintf(DBILOGFP, "  id: %c%c%c%c%c%c%c%c\n",
+    PerlIO_printf(DBILOGFP, "Dump of sqlda:\n");
+    PerlIO_printf(DBILOGFP, "  id: %c%c%c%c%c%c%c%c\n",
         sqlda->sqldaid[0], sqlda->sqldaid[1], sqlda->sqldaid[2],
         sqlda->sqldaid[3], sqlda->sqldaid[4], sqlda->sqldaid[5],
         sqlda->sqldaid[6], sqlda->sqldaid[7]);
-    fprintf(DBILOGFP, "  bc: %d\n  sqln: %d, sqld: %d\n",
+    PerlIO_printf(DBILOGFP, "  bc: %d\n  sqln: %d, sqld: %d\n",
         sqlda->sqldabc, sqlda->sqln, sqlda->sqld);
     for (i=0; i<sqlda->sqld; ++i) {
         IISQLVAR* var = &sqlda->sqlvar[i];
-        fprintf(DBILOGFP, "  sqlvar[%d]: type: %d, len: %d, ind: %d",
+        PerlIO_printf(DBILOGFP, "  sqlvar[%d]: type: %d, len: %d, ind: %d",
             i, var->sqltype, var->sqllen, var->sqlind);
         switch (var->sqltype) {
         case IISQ_INT_TYPE:
-            fprintf(DBILOGFP, ", var: %d\n",
+            PerlIO_printf(DBILOGFP, ", var: %d\n",
                 *((int*)(var->sqldata)));
             break;
         case IISQ_FLT_TYPE:
-            fprintf(DBILOGFP, ", var: %g\n",
+            PerlIO_printf(DBILOGFP, ", var: %g\n",
                 *((double*)(var->sqldata)));
             break;
         case IISQ_CHA_TYPE:
-            fprintf(DBILOGFP, ", var: '%s'\n",
+            PerlIO_printf(DBILOGFP, ", var: '%s'\n",
                 var->sqldata);
             break;
         default:
-            fprintf(DBILOGFP, ", unknown type: %d\n",
+            PerlIO_printf(DBILOGFP, ", unknown type: %d\n",
                 var->sqltype);
         }
     }
@@ -71,11 +71,11 @@ sql_check(h)
 
     if (sqlca.sqlcode < 0) { 
         if (dbis->debug >= 3) 
-            fprintf(DBILOGFP, "DBD::Ingres:sql_check: sqlcode=%d",
+            PerlIO_printf(DBILOGFP, "DBD::Ingres:sql_check: sqlcode=%d",
                     sqlca.sqlcode);
         sv_setiv(DBIc_ERR(imp_xxh), (IV)sqlca.sqlcode);
         if (dbis->debug >= 3) 
-            fprintf(DBILOGFP, " get errtext");
+            PerlIO_printf(DBILOGFP, " get errtext");
         EXEC SQL INQUIRE_INGRES(:errbuf = ERRORTEXT);
         { /* remove trailing "\n" */
             int i = strlen(errbuf)-1;
@@ -85,9 +85,9 @@ sql_check(h)
             }
         }
         if (dbis->debug >= 3) 
-            fprintf(DBILOGFP, " got errtext: '%s'", errbuf);
+            PerlIO_printf(DBILOGFP, " got errtext: '%s'", errbuf);
         sv_setpv(errstr, (char*)errbuf);
-        if (dbis->debug >= 3) fprintf(DBILOGFP, ", returning\n");
+        if (dbis->debug >= 3) PerlIO_printf(DBILOGFP, ", returning\n");
 	DBIh_EVENT2(h, ERROR_event, DBIc_ERR(imp_xxh), errstr);
         return 0;
     } else return 1;
@@ -118,7 +118,7 @@ set_session(dbh)
     EXEC SQL END DECLARE SECTION;
     if (cur_session != session_id) {
         if (dbis->debug >= 3)
-            fprintf(DBILOGFP, "set session_db(%d)\n", session_id);
+            PerlIO_printf(DBILOGFP, "set session_db(%d)\n", session_id);
         EXEC SQL SET_SQL(SESSION = :session_id);
         cur_session = session_id;
     }
@@ -165,7 +165,7 @@ release_statement(num)
     if (num < 0 || num >= statement_max*8) return;
     statement_numbers[num/8] &= ~(1<<(num%8));
     if (dbis->debug >= 4)
-        fprintf(DBILOGFP, "rel_st.nam: %d [%d]=%u\n", num, num/8,
+        PerlIO_printf(DBILOGFP, "rel_st.nam: %d [%d]=%u\n", num, num/8,
                 statement_numbers[num/8]);
 }
 
@@ -180,13 +180,13 @@ generate_statement_name(st_num, name)
     */    
     int i, found=0, num;
     if (dbis->debug >= 4)
-        fprintf(DBILOGFP, "gen_st.nam");
+        PerlIO_printf(DBILOGFP, "gen_st.nam");
     for (i=0; i<statement_max; i++) {
         /* see if there is a free statement-name
            in the already allocated lump */
         int bit;
         if (dbis->debug >= 4)
-            fprintf(DBILOGFP, " [%d]=%u", i, statement_numbers[i]);
+            PerlIO_printf(DBILOGFP, " [%d]=%u", i, statement_numbers[i]);
         for (bit=0; bit < 32; bit++) {
             if (((statement_numbers[i]>>bit) & 1) == 0) {
                 /* free bit found */
@@ -202,7 +202,7 @@ generate_statement_name(st_num, name)
         if (statement_max == 0) {
             /* first time round */
             if (dbis->debug >= 4)
-                fprintf(DBILOGFP, " alloc first time");
+                PerlIO_printf(DBILOGFP, " alloc first time");
             num = 0;
             Newz(42, statement_numbers, 8, U32);
             for(i = statement_max; i < statement_max+8; i++)
@@ -211,7 +211,7 @@ generate_statement_name(st_num, name)
         } else {
             num = statement_max * 32;
             if (dbis->debug >= 4)
-                fprintf(DBILOGFP, " alloc to %d", statement_max);
+                PerlIO_printf(DBILOGFP, " alloc to %d", statement_max);
             Renew(statement_numbers, statement_max+8, U32);
             for(i = statement_max; i < statement_max+8; i++)
                 statement_numbers[i] = 0;
@@ -221,7 +221,7 @@ generate_statement_name(st_num, name)
     statement_numbers[num/8] |= (1<<(num%8));
     sprintf(name, "s%d", num);
     if (dbis->debug >= 4)
-        fprintf(DBILOGFP, " returns %d\n", num);
+        PerlIO_printf(DBILOGFP, " returns %d\n", num);
     *st_num = num;
 }
 
@@ -231,13 +231,13 @@ fbh_dump(fbh, i)
     imp_fbh_t *fbh;
     int i;
 {
-    fprintf(DBILOGFP, "fbh_dump:");
-    fprintf(DBILOGFP, "fbh %d: '%s' %s, ",
+    PerlIO_printf(DBILOGFP, "fbh_dump:");
+    PerlIO_printf(DBILOGFP, "fbh %d: '%s' %s, ",
             i, fbh->var->sqlname.sqlnamec,
             (fbh->nullable) ? "NULLable" : "");
-    fprintf(DBILOGFP, "type %d,  origlen %d, len %d\n",
+    PerlIO_printf(DBILOGFP, "type %d,  origlen %d, len %d\n",
             fbh->origtype, fbh->origlen, fbh->len);
-    fprintf(DBILOGFP, "       VAR: type: %d, len: %d, ind: %p\n",
+    PerlIO_printf(DBILOGFP, "       VAR: type: %d, len: %d, ind: %p\n",
             fbh->var->sqltype, fbh->var->sqllen, fbh->var->sqlind);
 }
 
@@ -260,7 +260,7 @@ dbd_db_login(dbh, imp_dbh, dbname, user, pass)
     dTHR;
 
     if (dbis->debug >= 2)
-        fprintf(DBILOGFP,"DBD::Ingres::dbd_db_login: dbname: %s\n", dbname);
+        PerlIO_printf(DBILOGFP,"DBD::Ingres::dbd_db_login: dbname: %s\n", dbname);
 
     session = imp_dbh->session = nxt_session++;
     imp_dbh->trans_no = 1;
@@ -275,7 +275,7 @@ dbd_db_login(dbh, imp_dbh, dbname, user, pass)
     
     if (user && *user && *user != '/') {
         /* we have a username */
-        if (dbis->debug >= 3) fprintf(DBILOGFP, "    user='%s', opt='%s'\n",
+        if (dbis->debug >= 3) PerlIO_printf(DBILOGFP, "    user='%s', opt='%s'\n",
                                 user, opt);
         if (pass && *pass) {
 /*OI*       EXEC SQL CONNECT :dbname SESSION :session
@@ -292,11 +292,11 @@ dbd_db_login(dbh, imp_dbh, dbname, user, pass)
         }
     } else {
         /* just the databasename */
-        if (dbis->debug >= 3) fprintf(DBILOGFP, "    nouser\n");
+        if (dbis->debug >= 3) PerlIO_printf(DBILOGFP, "    nouser\n");
         EXEC SQL CONNECT :dbname SESSION :session OPTIONS = :opt;
     }
     if (dbis->debug >= 3)
-        fprintf(DBILOGFP, "    After connect, sqlcode=%d, session=%d\n",
+        PerlIO_printf(DBILOGFP, "    After connect, sqlcode=%d, session=%d\n",
                             sqlca.sqlcode, imp_dbh->session);
     cur_session = imp_dbh->session;
     if (!sql_check(dbh)) return 0;
@@ -313,7 +313,7 @@ dbd_db_login(dbh, imp_dbh, dbname, user, pass)
         if (!sql_check(dbh)) return 0;
 
         if (dbis->debug >= 3)
-            fprintf(DBILOGFP,"DBD::Ingres::dbd_db_connect(AUTOCOMMIT=%d)\n",
+            PerlIO_printf(DBILOGFP,"DBD::Ingres::dbd_db_connect(AUTOCOMMIT=%d)\n",
                     autocommit_state);
         DBIc_set(imp_dbh, DBIcf_AutoCommit, autocommit_state);
         if (!autocommit_state) {
@@ -333,7 +333,7 @@ dbd_db_do(dbh, statement)
 {
     D_imp_dbh(dbh);
     if (dbis->debug >= 2)
-        fprintf(DBILOGFP,"DBD::Ingres::dbd_db_do(\"%s\")\n", statement);
+        PerlIO_printf(DBILOGFP,"DBD::Ingres::dbd_db_do(\"%s\")\n", statement);
     set_session(dbh);
     
     EXEC SQL EXECUTE IMMEDIATE :statement;
@@ -349,7 +349,7 @@ dbd_db_commit(dbh, imp_dbh)
     dTHR;
      
     if (dbis->debug >= 2)
-        fprintf(DBILOGFP,"DBD::Ingres::dbd_db_commit\n");
+        PerlIO_printf(DBILOGFP,"DBD::Ingres::dbd_db_commit\n");
 
     /* Check for commit() being called whilst refs to cursors */
     /* still exists. This needs some more thought.            */
@@ -372,7 +372,7 @@ dbd_db_rollback(dbh, imp_dbh)
     dTHR;
      
     if (dbis->debug >= 2)
-        fprintf(DBILOGFP,"DBD::Ingres::dbd_db_rollback\n");
+        PerlIO_printf(DBILOGFP,"DBD::Ingres::dbd_db_rollback\n");
 
     /* Check for commit() being called whilst refs to cursors   */
     /* still exists. This needs some more thought.              */
@@ -395,7 +395,7 @@ dbd_db_get_dbevent(dbh, imp_dbh, wait)
     SV* wait;
 {
     if (dbis->debug >= 2)
-        fprintf(DBILOGFP,"DBD::Ingres::dbd_get_dbevent\n");
+        PerlIO_printf(DBILOGFP,"DBD::Ingres::dbd_get_dbevent\n");
 
     set_session(dbh);
     if (!wait || !SvOK(wait) || !SvIOK(wait)) {
@@ -420,7 +420,7 @@ dbd_db_get_dbevent(dbh, imp_dbh, wait)
     EXEC SQL END DECLARE SECTION;
 
     if (dbis->debug >= 2)
-        fprintf(DBILOGFP, "dbd_db_inquire_event\n");
+        PerlIO_printf(DBILOGFP, "dbd_db_inquire_event\n");
     set_session(dbh);
     EXEC SQL INQUIRE_INGRES
       (:event_name     = DBEVENTNAME,
@@ -430,7 +430,7 @@ dbd_db_get_dbevent(dbh, imp_dbh, wait)
        :event_time     = DBEVENTTIME
        );
     if (dbis->debug >= 2)
-        fprintf(DBILOGFP, "eventname = %s\n", event_name);
+        PerlIO_printf(DBILOGFP, "eventname = %s\n", event_name);
     if (!sql_check(dbh)) return (&sv_undef);
     if (!*event_name)    return (&sv_undef);
     result = newHV();
@@ -461,7 +461,7 @@ dbd_db_disconnect(dbh, imp_dbh)
 
     DBIc_ACTIVE_off(imp_dbh);
     if (dbis->debug >= 2)
-        fprintf(DBILOGFP,"DBD::Ingres::dbd_db_disconnect\n");
+        PerlIO_printf(DBILOGFP,"DBD::Ingres::dbd_db_disconnect\n");
 
     set_session(dbh);
     EXEC SQL INQUIRE_INGRES(:transaction_active = TRANSACTION);
@@ -489,7 +489,7 @@ dbd_db_destroy(dbh, imp_dbh)
     imp_dbh_t* imp_dbh;
 {
     if (dbis->debug >= 2)
-        fprintf(DBILOGFP,"DBD::Ingres::dbd_db_destroy\n");
+        PerlIO_printf(DBILOGFP,"DBD::Ingres::dbd_db_destroy\n");
 
     if (DBIc_ACTIVE(imp_dbh))
         dbd_db_disconnect(dbh, imp_dbh);
@@ -512,17 +512,17 @@ dbd_db_STORE_attrib(dbh, imp_dbh, keysv, valuesv)
     set_session(dbh);
     if (kl==10 && strEQ(key, "AutoCommit")){
         if (dbis->debug >= 3)
-            fprintf(DBILOGFP,"DBD::Ingres::dbd_db_STORE(AUTOCOMMIT=");
+            PerlIO_printf(DBILOGFP,"DBD::Ingres::dbd_db_STORE(AUTOCOMMIT=");
         if (on) {
             EXEC SQL COMMIT;
             EXEC SQL SET AUTOCOMMIT ON;
             if (dbis->debug >= 3)
-                fprintf(DBILOGFP,"ON), sqlcode=%d\n", sqlca.sqlcode);
+                PerlIO_printf(DBILOGFP,"ON), sqlcode=%d\n", sqlca.sqlcode);
         } else {
             EXEC SQL COMMIT;
             EXEC SQL SET AUTOCOMMIT OFF;
             if (dbis->debug >= 3)
-                fprintf(DBILOGFP,"OFF), sqlcode=%d\n", sqlca.sqlcode);
+                PerlIO_printf(DBILOGFP,"OFF), sqlcode=%d\n", sqlca.sqlcode);
         }
         DBIc_set(imp_dbh, DBIcf_AutoCommit, on);
     } else {
@@ -555,7 +555,7 @@ dbd_db_FETCH_attrib(dbh, imp_dbh, keysv)
         EXEC SQL SELECT INT4(DBMSINFO('AUTOCOMMIT_STATE'))
             INTO :autocommit_state;
         if (dbis->debug >= 3)
-            fprintf(DBILOGFP,
+            PerlIO_printf(DBILOGFP,
                 "DBD::Ingres::dbd_db_FETCH(AUTOCOMMIT=%d)sqlca=%d\n",
                 autocommit_state, sqlca.sqlcode);
         DBIc_set(imp_dbh, DBIcf_AutoCommit, autocommit_state);
@@ -600,7 +600,7 @@ dbd_st_prepare(sth, imp_sth, statement, attribs)
     D_imp_dbh_from_sth;
 
     if (dbis->debug >= 2)
-        fprintf(DBILOGFP,"DBD::Ingres::dbd_st_prepare('%s')\n", statement);
+        PerlIO_printf(DBILOGFP,"DBD::Ingres::dbd_st_prepare('%s')\n", statement);
 
     imp_sth->done_desc = 0;
     sqlda = &imp_sth->sqlda;
@@ -614,26 +614,26 @@ dbd_st_prepare(sth, imp_sth, statement, attribs)
         char *n;
         while (*p && *p != 's' && *p != 'S') ++p; /* find s in select */
         if (dbis->debug >= 4)
-            fprintf(DBILOGFP, "Statement = %s \n", p);
+            PerlIO_printf(DBILOGFP, "Statement = %s \n", p);
         p += 6; /* points past select */
         if (dbis->debug >= 4)
-            fprintf(DBILOGFP, "Statement = %s \n", p);
+            PerlIO_printf(DBILOGFP, "Statement = %s \n", p);
         while (*p && *p <= 32) ++p; /* past any whitespace */
         if (dbis->debug >= 4)
-            fprintf(DBILOGFP, "Statement3 = %s \n", p);
+            PerlIO_printf(DBILOGFP, "Statement3 = %s \n", p);
         generate_statement_name(&imp_sth->st_num, name);
         /*imp_sth->st_num = hash(statement);
         if (dbis->debug >= 4)
-            fprintf(DBILOGFP, "Num = %d \n", imp_sth->st_num);
+            PerlIO_printf(DBILOGFP, "Num = %d \n", imp_sth->st_num);
         sprintf(name, "s%d", imp_sth->st_num);*/
         if (dbis->debug >= 4)
-            fprintf(DBILOGFP, "Name = %s \n", name);
+            PerlIO_printf(DBILOGFP, "Name = %s \n", name);
         n = name + strlen(name); /* points at \0 at end */
         if (dbis->debug >= 4)
-            fprintf(DBILOGFP, "Name1 = %s \n", n);
+            PerlIO_printf(DBILOGFP, "Name1 = %s \n", n);
         *n++ = '_';
         if (dbis->debug >= 4)
-            fprintf(DBILOGFP, "Name2 = %s \n", n);
+            PerlIO_printf(DBILOGFP, "Name2 = %s \n", n);
         while (*p && n < (name+23)) {
             if (isalnum(*p)) {
                 *n++ = *p;
@@ -644,7 +644,7 @@ dbd_st_prepare(sth, imp_sth, statement, attribs)
         imp_sth->name = savepv(name);
     }
     if (dbis->debug >= 3)
-        fprintf(DBILOGFP,
+        PerlIO_printf(DBILOGFP,
             "DBD::Ingres::dbd_st_prepare stmt('%s') name:%s, sqlda: %p\n",
             statement, name, sqlda);
 
@@ -719,12 +719,12 @@ dbd_describe(sth, imp_sth)
     int i;
     
     if (dbis->debug >= 2)
-        fprintf(DBILOGFP,
+        PerlIO_printf(DBILOGFP,
             "DBD::Ingres::dbd_describe(name: %s)\n", imp_sth->name);
 
     if (imp_sth->done_desc) {
       if (dbis->debug >= 3) 
-          fprintf(DBILOGFP,
+          PerlIO_printf(DBILOGFP,
             "In: DBD::Ingres::dbd_describe() done_desc = true\n");
       return 1; /* success, already done it */
     }
@@ -742,7 +742,7 @@ dbd_describe(sth, imp_sth)
         var->sqlname.sqlnamec[var->sqlname.sqlnamel] = 0;
         
         if (dbis->debug >= 3)
-            fprintf(DBILOGFP, "  field %d, type=%d\n", 1, var->sqltype);
+            PerlIO_printf(DBILOGFP, "  field %d, type=%d\n", 1, var->sqltype);
             
         switch (var->sqltype) {
         case IISQ_INT_TYPE:
@@ -795,13 +795,13 @@ dbd_describe(sth, imp_sth)
                  /* so that we can use this as an indicator variable later */
         }
         if (dbis->debug >= 2) {
-            fprintf(DBILOGFP, "dumping it\n");
+            PerlIO_printf(DBILOGFP, "dumping it\n");
             fbh_dump(fbh, i);
         }
     } /* end allocation of field-data */
 
     if (dbis->debug >= 2)
-        fprintf(DBILOGFP,"DBD::Ingres::dbd_st_describe(%s) finished\n",
+        PerlIO_printf(DBILOGFP,"DBD::Ingres::dbd_st_describe(%s) finished\n",
                 imp_sth->name);
 
     return 1;
@@ -831,7 +831,7 @@ dbd_bind_ph (sth, imp_sth, param, value, sql_type, attribs, is_inout, maxlen)
     }
 
     if (dbis->debug >= 2)
-        fprintf(DBILOGFP, "DBD::Ingres::dbd_bind_ph(%d)\n",
+        PerlIO_printf(DBILOGFP, "DBD::Ingres::dbd_bind_ph(%d)\n",
             param_no);
 
     if (param_no < 1 || param_no > DBIc_NUM_PARAMS(imp_sth))
@@ -872,7 +872,7 @@ dbd_bind_ph (sth, imp_sth, param, value, sql_type, attribs, is_inout, maxlen)
         type = 3;
     }
     if (dbis->debug >= 3)
-        fprintf(DBILOGFP, "  type=%d\n", type);
+        PerlIO_printf(DBILOGFP, "  type=%d\n", type);
     switch (type) {
       /* Poor mans memory management: We store the actual length of
          the buffer one int below var->sqldata. */
@@ -938,7 +938,7 @@ dbd_bind_ph (sth, imp_sth, param, value, sql_type, attribs, is_inout, maxlen)
         break; }
     }
     if (!SvOK(value)) {
-        if (dbis->debug >= 3) fprintf(DBILOGFP, "bind(NULL)");
+        if (dbis->debug >= 3) PerlIO_printf(DBILOGFP, "bind(NULL)");
         if (var->sqldata == (char *)&sv_undef) {
           Newz(42, buf, 2, int);
           *buf = 2;
@@ -961,7 +961,10 @@ dbd_bind_ph (sth, imp_sth, param, value, sql_type, attribs, is_inout, maxlen)
 }
 
 int
-dbd_st_execute(sth, imp_sth)    /* =0 is error, <>0 is ok */
+dbd_st_execute(sth, imp_sth)
+/* >=0: OK, no of rows affected,
+**  -1: OK, unknown number of rows affected,
+**  -2: error */
     SV *sth;
     imp_sth_t *imp_sth;
 {
@@ -972,7 +975,7 @@ dbd_st_execute(sth, imp_sth)    /* =0 is error, <>0 is ok */
     D_imp_dbh_from_sth;
  
     if (dbis->debug >= 2)
-        fprintf(DBILOGFP, "DBD::Ingres::dbd_st_execute(%s)\n", imp_sth->name);
+        PerlIO_printf(DBILOGFP, "DBD::Ingres::dbd_st_execute(%s)\n", imp_sth->name);
 
     /* needs to check for re-prepare (after commit etc.) */
     if (imp_sth->trans_no != imp_dbh->trans_no) {
@@ -982,7 +985,7 @@ dbd_st_execute(sth, imp_sth)    /* =0 is error, <>0 is ok */
     if (!imp_sth->done_desc) {
         /* describe and allocate storage for results */
         if (!dbd_describe(sth, imp_sth))
-            return 0; /* dbd_describe already called sql_check() */
+            return -2; /* dbd_describe already called sql_check() */
     }
 
     /* Trigger execution of the statement */
@@ -991,7 +994,7 @@ dbd_st_execute(sth, imp_sth)    /* =0 is error, <>0 is ok */
     if (DBIc_NUM_FIELDS(imp_sth) == 0) {
         /* non-select statement: just execute it */
         if (dbis->debug >= 2)
-            fprintf(DBILOGFP,
+            PerlIO_printf(DBILOGFP,
                 "DBD::Ingres::dbd_st_execute - non-select, param=%d\n",
                 imp_sth->ph_sqlda.sqld);
 
@@ -1000,7 +1003,7 @@ dbd_st_execute(sth, imp_sth)    /* =0 is error, <>0 is ok */
         } else {
             EXEC SQL EXECUTE :name;
         }
-        return sql_check(sth) ? sqlca.sqlerrd[2] : 0;
+        return sql_check(sth) ? sqlca.sqlerrd[2] : -2;
     } else {
 	int is_readonly;
         /* select statement: open a cursor */
@@ -1015,7 +1018,7 @@ dbd_st_execute(sth, imp_sth)    /* =0 is error, <>0 is ok */
 	  else is_readonly = 0;
 	}
         if (dbis->debug >= 2)
-            fprintf(DBILOGFP,
+            PerlIO_printf(DBILOGFP,
                 "DBD::Ingres::dbd_st_execute - cursor %s - param=%d %sreadonly\n",
                 name, imp_sth->ph_sqlda.sqld, is_readonly ? "" : "NOT ");
 
@@ -1034,7 +1037,7 @@ dbd_st_execute(sth, imp_sth)    /* =0 is error, <>0 is ok */
 		    EXEC SQL OPEN :name;
 		}
 	}
-        if (!sql_check(sth)) return 0;
+        if (!sql_check(sth)) return -2;
         DBIc_ACTIVE_on(imp_sth);
         return -1 /* Unknown number of rows */;
     }
@@ -1055,7 +1058,7 @@ dbd_st_fetch(sth, imp_sth)
     D_imp_dbh_from_sth;
 
     if (dbis->debug >= 2)
-        fprintf(DBILOGFP,"DBD::Ingres::dbd_st_fetch(%s)\n", imp_sth->name);
+        PerlIO_printf(DBILOGFP,"DBD::Ingres::dbd_st_fetch(%s)\n", imp_sth->name);
 
     /* needs to check for re-prepare (after commit etc.) */
     if (imp_sth->trans_no != imp_dbh->trans_no) {
@@ -1080,7 +1083,7 @@ dbd_st_fetch(sth, imp_sth)
     num_fields = AvFILL(av)+1;
 
     if (dbis->debug >= 3)
-        fprintf(DBILOGFP, "    dbd_st_fetch %d fields\n", num_fields);
+        PerlIO_printf(DBILOGFP, "    dbd_st_fetch %d fields\n", num_fields);
 
     for(i=0; i < num_fields; ++i) {
         imp_fbh_t *fbh = &imp_sth->fbh[i];
@@ -1088,23 +1091,23 @@ dbd_st_fetch(sth, imp_sth)
         int ch;
         SV *sv = AvARRAY(av)[i]; /* Note: we (re)use the SV in the AV */
         if (dbis->debug >= 3)
-            fprintf(DBILOGFP, "    Field #%d: ", i);
+            PerlIO_printf(DBILOGFP, "    Field #%d: ", i);
         if (fbh->indic == -1) {
             /* NULL value */
             (void)SvOK_off(sv);
-            if (dbis->debug >= 3) fprintf(DBILOGFP, "NULL\n");
+            if (dbis->debug >= 3) PerlIO_printf(DBILOGFP, "NULL\n");
         } else {
             switch (fbh->type[0]) {
             case 'd':
                 sv_setiv(sv, (IV)*(int*)var->sqldata);
                 if (dbis->debug >= 3)
-                    fprintf(DBILOGFP, "Int: %ld %d %d\n",
+                    PerlIO_printf(DBILOGFP, "Int: %ld %d %d\n",
                           SvIV(sv), fbh->var_ptr.iv, *(int*)var->sqldata);
                 break;
             case 'f':
                 sv_setnv(sv, *(double*)var->sqldata);
                 if (dbis->debug >= 3)
-                    fprintf(DBILOGFP, "Double: %lf\n", SvNV(sv));
+                    PerlIO_printf(DBILOGFP, "Double: %lf\n", SvNV(sv));
                 break;
             case 's':
                 SvCUR(fbh->sv) = fbh->len;
@@ -1122,7 +1125,7 @@ dbd_st_fetch(sth, imp_sth)
                 sv_setsv(sv, fbh->sv);
                 SvCUR(sv) = strlen(SvPVX(sv));
                 if (dbis->debug >= 3)
-                    fprintf(DBILOGFP, "Text: '%s', Chop: %d\n",
+                    PerlIO_printf(DBILOGFP, "Text: '%s', Chop: %d\n",
                         SvPVX(sv), DBIc_has(imp_sth, DBIcf_ChopBlanks));
                 break;
             default:
@@ -1131,7 +1134,7 @@ dbd_st_fetch(sth, imp_sth)
             }
         }
     }
-    if (dbis->debug >= 3) fprintf(DBILOGFP, "    End fetch\n");
+    if (dbis->debug >= 3) PerlIO_printf(DBILOGFP, "    End fetch\n");
     return av;
 }
 
@@ -1144,11 +1147,11 @@ dbd_st_rows(sth, imp_sth)
     int rowcount;
     EXEC SQL END DECLARE SECTION;
     if (dbis->debug >= 2)
-        fprintf(DBILOGFP, "dbd_rows\n");
+        PerlIO_printf(DBILOGFP, "dbd_rows\n");
     set_session(DBIc_PARENT_H(imp_sth));
     EXEC SQL INQUIRE_INGRES(:rowcount = ROWCOUNT);
     if (dbis->debug >= 2)
-        fprintf(DBILOGFP, "rowcount = %d\n", rowcount);
+        PerlIO_printf(DBILOGFP, "rowcount = %d\n", rowcount);
     if (!sql_check(sth)) return -1;
     else return rowcount;
 }
@@ -1166,7 +1169,7 @@ dbd_st_finish(sth, imp_sth)
     /* Cancel further fetches from this cursor.                 */
     if (DBIc_ACTIVE(imp_sth)) {
         if (dbis->debug >= 3)
-            fprintf(DBILOGFP,"DBD::Ingres::dbd_st_finish(%s)\n",
+            PerlIO_printf(DBILOGFP,"DBD::Ingres::dbd_st_finish(%s)\n",
                 imp_sth->name);
         set_session(DBIc_PARENT_H(imp_sth));
         EXEC SQL CLOSE :name;
@@ -1174,7 +1177,7 @@ dbd_st_finish(sth, imp_sth)
     DBIc_ACTIVE_off(imp_sth);
 
     if (dbis->debug >= 2)
-        fprintf(DBILOGFP,"DBD::Ingres::dbd_st_finish(%s)\n", imp_sth->name);
+        PerlIO_printf(DBILOGFP,"DBD::Ingres::dbd_st_finish(%s)\n", imp_sth->name);
 
     return 1;
 }
@@ -1188,7 +1191,7 @@ dbd_st_destroy(sth, imp_sth)
     D_imp_dbh_from_sth;
     
     if (dbis->debug >= 2)
-        fprintf(DBILOGFP,"DBD::Ingres::dbd_st_destroy(%s)\n",
+        PerlIO_printf(DBILOGFP,"DBD::Ingres::dbd_st_destroy(%s)\n",
             imp_sth->name);
 
     release_statement(imp_sth->st_num);
@@ -1227,7 +1230,7 @@ dbd_st_STORE_attrib(sth, imp_sth, keysv, valuesv)
     dTHR;
 
     if (dbis->debug >=3)
-        fprintf(DBILOGFP,"DBD::Ingres::dbd_st_STORE(%s)->{%s}\n",
+        PerlIO_printf(DBILOGFP,"DBD::Ingres::dbd_st_STORE(%s)->{%s}\n",
                 imp_sth->name, key);
 
     return FALSE; /* no values to store */
@@ -1252,7 +1255,7 @@ dbd_st_FETCH_attrib(sth, imp_sth, keysv)
     int cacheit = TRUE;
 
     if (dbis->debug >= 3)
-        fprintf(DBILOGFP, "DBD::Ingres::dbd_st_FETCH(%s)->{%s}\n",
+        PerlIO_printf(DBILOGFP, "DBD::Ingres::dbd_st_FETCH(%s)->{%s}\n",
                 imp_sth->name, key);
 
     if (!imp_sth->done_desc && !dbd_describe(sth, imp_sth)) {

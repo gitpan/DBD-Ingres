@@ -16,7 +16,7 @@ use DBI 0.73;
 use Exporter;
 use Carp;
 
-$VERSION = substr(q$Revision: #2 $, 11)/100;
+$VERSION = 3.0+substr(q$Revision: #2 $, 11)/100;
 
 @ISA = qw(Exporter);
 

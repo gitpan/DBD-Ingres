@@ -58,46 +58,18 @@ You should never need to make any changes. If you do *please* let me
 know so that I can try to make it automatic in a later release.
 
 New features (See the CHANGES file for a complete list):
+
+v0.32       2002.03.06
+ -Changes for perl5.7.3: all fprintf calls replaces by PerlIO_printf.
+ -Bug in $sth->execute fixed. Sometimes errors were not detected.
+  Thanks to Dirk Kraemer <kraemer@rz.uni-kiel.de>.
+ -Fixed Ingperl versionnumber so that CPAN is happier.
+
 v0.31       2001.09.17
  -To aid errorhandling dbh->{Statement} will contain the text of the SQL
   statement being executed during $dbh->do calls. This is an extension to
   the normal DBI spec due to the special handling of $dbh->do in DBD::Ingres.
  -Minor improvents in the tests.
-
-v0.30       2001.04.03
-  Withdrawal of version 0.29 - causes bugs with "normal" VARCHAR fields
-  - will have to think a while.
-
-v0.29       2001.03.20
-  Fetch of binary data (ie CHAR or VARCHAR containing '\0' chars) didn't
-  work. The fields were truncated at the \0-char. Pointed out by               
-  Mike Yudaken <miyu@icon.co.za>.                                              
-
-v0.28       2001.02.26
-  The error handling did'nt call the DBIh_EVENT2 macro that properly
-  registers the error int the DBI.
-  Ingperl.pm had a bug in the $Revision string, which caused cpan.pm to
-  complain
-
-v0.27       2001.01.12
- $sth->{Statement} was not implemented. DBIx::XML_RDB needs it.
-
-v0.26       2000.11.20
-  $dbh->table_info raised an Ingres error because of the null. This
-  has been worked around (Thanks to Dirk Kraemer <kraemer@rz.uni-kiel.de>).
-  Minor changes due to change of internal version control system from CVS
-  to Perforce.
-  Changed my old (now disfunctional) mail adress to the new (and hopefully
-  permanent one: htoug@cpan.org).
-  Removed some (2) occurences of \r in the code.
-
-v0.25       2000.01.31
-  Included patches for autodetect of OpenIngres on VMS, thanks to Sebastian
-  Bazley <Sebastian.BAZLEY@sema.co.uk>; Now build cleanly on VMS with DBI1.00.
-  Added RaiseError=>1 to the connect in t/dbi.t as per current
-  recomendation.
-  Changed the error return value of execute to 0 (not 0E0 which is the OK
-  with 0 rows), not -1, or -2 as it was. Wonder why though?
 
 KNOWN PROBLEMS:
 
@@ -135,7 +107,7 @@ TO DO LIST:
         o Add a way to call database procedures.
         o Add cached statements
         o Track the changes in the DBI spec
-        o Verify that DBD::Ingres work under Apache::DBI (and make neccesary
+        o Verify that DBD::Ingres works under Apache::DBI (and make neccesary
           changes)
 
 IF YOU HAVE PROBLEMS:
@@ -143,18 +115,20 @@ IF YOU HAVE PROBLEMS:
 Firstly, check the Frequently Asked Questions, Known Bugs and any other
 pertinent documents at:
 
-	http://www.symbolstone.org/technology/perl/DBI
+	http://dbi.perl.org/
 
-If this does *not* resolve your problem, please post details to 
-dbi-user@fugue.com and CC them to me at htoug@cpan.org
+If this does *not* resolve your problem, please post details to
+dbi-users@perl.org (to subscribe mail to dbi-users-help@perl.org)
+and CC them to me at htoug@cpan.org
+
 Please include:
 
 1. A complete log of a complete build, e.g.:
 
 	perl Makefile.PL -v           (do a make realclean first)
 	make
-	make test
-	DBI_TRACE=3 make test
+	DBI_DSN=<database name> make test
+	DBI_TRACE=3 DBI_DSN=<database name> make test
 
 2. Full details of which version of Ingres/esql and Perl you're using.
 
@@ -169,7 +143,8 @@ Please include:
 5. Please don't post problems to comp.lang.perl.misc or perl5-porters.
 
 6. If you are not currently subscribed to the mailing list please
-   subscribe via http://www.isc.org/dbi-lists.html
+   subscribe via dbi-users-help@perl.org
+
 
 
 Original document: (c)Tim Bunce
