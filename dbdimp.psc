@@ -1,5 +1,5 @@
 /*                               -*- Mode: C -*- 
- * $Id: //depot/tilpasninger/dbd-ingres/dbdimp.psc#10 $
+ * $Id: //depot/tilpasninger/dbd-ingres/dbdimp.psc#11 $
  *
  * Copyright (c) 1994,1995  Tim Bunce
  *           (c) 1996,1997  Henrik Tougaard
@@ -15,7 +15,6 @@
  * me: htoug@cpan.org
  *
  */
-
 
 EXEC SQL INCLUDE 'Ingres.sh';
 
@@ -88,7 +87,6 @@ sql_check(h)
             PerlIO_printf(DBILOGFP, " got errtext: '%s'", errbuf);
         sv_setpv(errstr, (char*)errbuf);
         if (dbis->debug >= 3) PerlIO_printf(DBILOGFP, ", returning\n");
-	DBIh_EVENT2(h, ERROR_event, DBIc_ERR(imp_xxh), errstr);
         return 0;
     } else return 1;
 }
@@ -105,7 +103,6 @@ error(h, error_num, text, state)
     sv_setiv(DBIc_ERR(imp_xxh), (IV)error_num);
     sv_setpv(errstr, text);
     if (state != 0) sv_setpv(DBIc_STATE(imp_xxh), state);
-    DBIh_EVENT2(h, ERROR_event, DBIc_ERR(imp_xxh), errstr);
 }
 
 static void
@@ -146,8 +143,6 @@ dbd_discon_all(drh, imp_drh)
         sv_setiv(DBIc_ERR(imp_drh), (IV)1);
         sv_setpv(DBIc_ERRSTR(imp_drh),
             (char*)"disconnect_all not implemented");
-        DBIh_EVENT2(drh, ERROR_event,
-            DBIc_ERR(imp_drh), DBIc_ERRSTR(imp_drh));
         return FALSE;
     }
     if (perl_destruct_level)

@@ -1,4 +1,7 @@
-$Id: //depot/tilpasninger/dbd-ingres/CHANGES#13 $ $DateTime: 2002/11/22 11:11:32 $ $Author: ht000 $
+$Id: //depot/tilpasninger/dbd-ingres/CHANGES#14 $ $DateTime: 2003/07/03 08:57:52 $ $Author: ht000 $
+v0.37       2003.07.03
+ -removed the saving of statement text in $dbh->do as an interim solution
+  to avoid errors. Pointed out by David Coulthart <davec@columbia.edu>.
 v0.36       2002.11.22
  -bind_param didn't accept type SQL_DATE. I should have been a stringish
   type. Pointed out by Mark Buckle <mark.buckle@intechsolutions.co.uk>

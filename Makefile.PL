@@ -1,5 +1,5 @@
 #!/usr/local/bin/perl -sw
-# $Id: //depot/tilpasninger/dbd-ingres/Makefile.PL#2 $
+# $Id: //depot/tilpasninger/dbd-ingres/Makefile.PL#4 $
 
 require 5.004;
 
@@ -23,6 +23,7 @@ my $Is_NT = $Config{osname} eq 'MSWin32';
 my %opts = (
     NAME => 'DBD::Ingres',
     VERSION_FROM => 'Ingres.pm',
+    PREREQ_PM => {"DBI"=>1.00, "Getopt::Long"=>0, "Config"=>0},
     dist  => { DIST_DEFAULT=> 'clean distcheck disttest tardist',
                PREOP => '$(MAKE) -f Makefile.old distdir',
 	       COMPRESS => 'gzip', SUFFIX => 'gz', },
@@ -177,14 +178,11 @@ $opts{macro} = { ESQLC => $ESQLC, ESQLCOPT => "-o.h" };
 $opts{DEFINE} = '-DOPENINGRES' if $OpenIngres;
 WriteMakefile(%opts);
 
-exit 0;
-
 sub MY::post_initialize {
     my $self = shift;
     # Ensure Ingperl.pm and ingperl.pl are installed into top lib dir
     $self->{PM}->{'Ingperl.pm'} = '$(INST_LIB)/Ingperl.pm';
     $self->{PM}->{'ingperl.pl'} = '$(INST_LIB)/ingperl.pl';
-    
     '';
 }
 
@@ -243,4 +241,5 @@ $(BASEEXT).xsi: $(DBI_DRIVER_XST)
 
 }
 
-__END__
+1;
+
