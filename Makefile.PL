@@ -1,5 +1,5 @@
 #!/usr/local/bin/perl -sw
-# $Id: //depot/tilpasninger/dbd-ingres/Makefile.PL#4 $
+# $Id: //depot/tilpasninger/dbd-ingres/Makefile.PL#5 $
 
 require 5.004;
 
@@ -127,9 +127,9 @@ if ($Is_VMS) {
        unless -x $ESQLC;
 }
 
-# Solaris needs the elf-library
+# Solaris needs some extra libraries
 if ($Config{osname} eq 'solaris') {
-    $linkwith .= " -lelf";
+    $linkwith .= " -lelf -lposix4";
 }
 
 # HP-UX cannot link a non-PIC object file into a shared library.

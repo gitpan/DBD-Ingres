@@ -1,4 +1,7 @@
-$Id: //depot/tilpasninger/dbd-ingres/CHANGES#15 $ $DateTime: 2003/07/03 17:04:55 $ $Author: ht000 $
+$Id: //depot/tilpasninger/dbd-ingres/CHANGES#16 $ $DateTime: 2003/07/09 12:59:23 $ $Author: ht000 $
+v0.39       2003.07.09
+ -added posix4 lib to the list of libraries for Solaris, thanks to
+  "Mulcahy, Damien" <dmulcahy@revenue.ie>
 v0.38       2003.07.03
  -Tim Bunce <Tim.Bunce@pobox.com> came with the correct solution to the
   $dbh->do and $dbh->{Statement} problem.

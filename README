@@ -62,6 +62,9 @@ New features (See the CHANGES file for a complete list):
 Note: a new release incorporating  binary/long support from
        Mike Battersby <mib@unimelb.edu.au> is due real soon.
 
+v0.39       2003.07.09
+ -added posix4 lib to the list of libraries for Solaris, thanks to
+  "Mulcahy, Damien" <dmulcahy@revenue.ie>
 v0.38       2003.07.03
  -Tim Bunce <Tim.Bunce@pobox.com> came with the correct solution to the
   $dbh->do and $dbh->{Statement} problem.
