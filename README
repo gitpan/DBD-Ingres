@@ -59,29 +59,10 @@ know so that I can try to make it automatic in a later release.
 
 New features (See the CHANGES file for a complete list):
 
-Note: a new release incorporating  binary/long support from
-       Mike Battersby <mib@unimelb.edu.au> is due real soon.
+This is the long-awaited new release incorporating binary/long support
+from Mike Battersby <mib@unimelb.edu.au>, and a lot of work in
+removing memory leaks.
 
-v0.39       2003.07.09
- -added posix4 lib to the list of libraries for Solaris, thanks to
-  "Mulcahy, Damien" <dmulcahy@revenue.ie>
-v0.38       2003.07.03
- -Tim Bunce <Tim.Bunce@pobox.com> came with the correct solution to the
-  $dbh->do and $dbh->{Statement} problem.
-v0.37       2003.07.03
- -removed the saving of statement text in $dbh->do as an interim solution
-  to avoid errors. Pointed out by David Coulthart <davec@columbia.edu>.
-v0.36       2002.11.22
- -bind_param didn't accept type SQL_DATE. I should have been a stringish
-  type. Pointed out by Mark Buckle <mark.buckle@intechsolutions.co.uk>
-v0.35       2002.05.31
- -The test in dbi.t on column name must be case insensitive. Pointed
-  out by Lenio Eric <elenio@mct.rochester.edu>.
- -Further refinements in the AutoCommit area: failed when setting
-  $dbh->{AutoCommit} to 1 when it already was 1. Pointed out by
-  Preben Sørensen <pso001@foa.dk>. Perhaps someday I'll get it right :-P
-v0.34       2002.05.18
- -Setting $dbh->{AutoCommit}=1 trigers a commit as per the DBI specs.
 
 KNOWN PROBLEMS:
 

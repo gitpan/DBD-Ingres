@@ -7,6 +7,7 @@ ingtest.pl
 ingperl.pl
 Makefile.PL
 MANIFEST
+t/datatypes.t
 t/dbi.t
 t/event.t
 t/exec.t

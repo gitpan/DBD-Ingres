@@ -24,6 +24,8 @@ EXEC SQL INCLUDE SQLCA;
 #define IISQ_DEC_TYPE -9999
 #endif
 
+#define HANDLER_READ_SIZE  64 * 1024
+
 typedef struct imp_fbh_st imp_fbh_t;
 
 struct imp_drh_st {
@@ -35,7 +37,6 @@ struct imp_drh_st {
 struct imp_dbh_st {
     dbih_dbc_t com;         /* MUST be first element in structure   */
     int        session;     /* session id for this connection */
-    imp_sth_t *sth_lst;     /* pointer to first statement in chain */
     int        trans_no;    /* transaction sequence number, is
                             ** incremented by 1 at every commit/
                             ** rollback */
@@ -52,28 +53,23 @@ struct imp_sth_st {
     int        st_num;      /* statement number */
     int        done_desc;   /* have we described this sth yet ?	*/
     IISQLDA    ph_sqlda;    /* descriptor for placeholders */
-    imp_fbh_t *fbh;	        /* array of imp_fbh_t structs	*/
+    imp_fbh_t *fbh;	    /* array of imp_fbh_t structs	*/
 };
 
 struct imp_fbh_st { 	    /* field buffer */
-    imp_sth_t *imp_sth;	    /* 'parent' statement */
+    SV*         sth;	    /* 'parent' statement */
 
     /* Ingres description of the field	*/
     IISQLVAR*   var;        /* pointer to Ingres description */
     int         nullable;   /* 1 if field is nullable */
     int         origtype;   /* the ingres type (as given by Ingres originally), this type has possibly been modified...*/
-    char        type[2];    /* type "i"=int, "f"=double, "s"=string */
+    char        type[2];    /* type "i"=int, "f"=double, "s"=string, "l"=long */
     int         len;        /* length of field in bytes */
     int         origlen;    /* length of the field in Ingres */
 
     /* Our storage space for the field data as it's fetched	*/
     short       indic;      /* null/trunc indicator variable	*/
     SV*         sv;         /* buffer for the data (perl & ingres) */
-    union   {
-        int *   iv;
-        double* nv;
-        char*   pv;
-    } var_ptr;              /* buffer for data */
 };
 
 /* DBD::Ingres extensions */

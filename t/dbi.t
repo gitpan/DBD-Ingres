@@ -49,6 +49,7 @@ sub connect_db($$) {
     my $dbh = DBI->connect($dbname, "", "",
 	{ AutoCommit => 0,
 #          RaiseError => 1,
+	   PrintError => 0,
         });
     $dbh->{ChopBlanks} = 1;
     if ($dbh) {
@@ -163,6 +164,73 @@ ok(0, $sth->finish, "finish", 1);
 ###}
 
 ok(0, $dbh->do( "DROP TABLE $testtable" ), "Dropping table", 1);
+ok(0, $dbh->do("CREATE TABLE $testtable(id INTEGER4 not null, name LONG VARCHAR, bin BYTE VARYING(64))"), "Create long varchar table", 1);
+ok(0, $dbh->do("INSERT INTO $testtable (id, name) VALUES(1, '')"),
+    "Long varchar zero-length insert", 1);
+ok(0, $dbh->do("DELETE FROM $testtable WHERE id = 1"),
+    "Long varchar delete", 1);
+$cursor = $dbh->prepare("INSERT INTO $testtable (id, name) VALUES (?, ?)");
+$cursor->bind_param(1, 1);
+$cursor->bind_param(2, "AaBb" x 1024, DBI::SQL_LONGVARCHAR);
+ok(0, $cursor->execute, "Long varchar insert of 4096 bytes", 1);
+$cursor->finish;
+$cursor = $dbh->prepare("UPDATE $testtable SET name = ? WHERE ID = 1");
+$cursor->bind_param(1, "CcDd" x 512, DBI::SQL_LONGVARCHAR);
+ok(0, $cursor->execute, "Long varchar update of 2048 bytes", 1);
+$cursor->finish;
+ok(0, $cursor = $dbh->prepare("SELECT name FROM $testtable"),
+     "Long varchar prepare(select)", 1);
+ok(0, $cursor->execute, "Long varchar execute(select)", 1);
+$row = $cursor->fetchrow_arrayref;
+ok(0, ${$row}[0] eq 'CcDd' x 512, "Long varchar fetch", 1);
+ok(0, $cursor->finish, "Long varchar finish", 1);
+
+# Reading a long varchar with LongReadLen = 0 should always return undef.
+$dbh->{LongReadLen} = 0;
+ok(0, $dbh->{LongReadLen} == 0, "Set LongReadLen = 0", 1);
+$cursor = $dbh->prepare("SELECT name FROM $testtable");
+$cursor->execute;
+$row = $cursor->fetchrow_arrayref;
+ok(0, !defined $row->[0], "Long varchar fetch with LongReadLen=0", 1);
+$cursor->finish;
+
+# Reading a long varchar longer than LongReadLen with TruncOk set to 1
+# should return the truncated value.
+$dbh->{LongReadLen} = 5;
+$dbh->{LongTruncOk} = 1;
+$cursor = $dbh->prepare("SELECT name FROM $testtable");
+$cursor->execute;
+$row = $cursor->fetchrow_arrayref;
+ok(0, $row->[0] eq 'CcDdC',
+     "Long varchar fetch with LongReadLen=5 LongTruncOk=1", 1);
+$cursor->finish;
+
+# Reading a long varchar longer than LongReadLen with TrunkOk set to 0
+# should fail with an error.
+$dbh->{LongReadLen} = 5;
+$dbh->{LongTruncOk} = 0;
+$cursor = $dbh->prepare("SELECT name FROM $testtable");
+$cursor->execute;
+eval {
+	$row = $cursor->fetchrow_arrayref;
+};
+ok(0, !defined $row, "Long varchar fetch with LongReadLen=5 LongTruncOk=0", 1);
+$cursor->finish;
+
+# Binary data testing
+$dbh->do("DELETE FROM $testtable");
+$cursor = $dbh->prepare("INSERT INTO $testtable (id, bin) VALUES (?, ?)");
+$cursor->bind_param(1, 1);
+$cursor->bind_param(2, "\0\1\2\3\0\1\2\3\0\1\2\3", DBI::SQL_VARBINARY);
+ok(0, $cursor->execute, "Insert of binary data", 0);
+$cursor->finish;
+$cursor = $dbh->prepare("SELECT bin FROM $testtable WHERE id = 1");
+$cursor->execute;
+$row = $cursor->fetchrow_arrayref;
+ok(0, ${$row}[0] eq "\0\1\2\3\0\1\2\3\0\1\2\3", "Binary data fetch", 1);
+$cursor->finish;
+
+ok(0, $dbh->do( "DROP TABLE $testtable" ), "Dropping table", 1);
 ok(0, $dbh->rollback, "Rolling back", 1);
 #   What else??
 ok(0, !$dbh->{AutoCommit}, "AutoCommit switched off upon connect time", 1);
@@ -184,5 +252,5 @@ $dbh and $dbh->disconnect;
 #   test of outerjoin and nullability
 #   what else?
 
-BEGIN { $num_test = 50; }
+BEGIN { $num_test = 66; }
 

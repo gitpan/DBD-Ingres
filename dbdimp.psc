@@ -47,9 +47,14 @@ static void dump_sqlda(sqlda)
             PerlIO_printf(DBILOGFP, ", var: %g\n",
                 *((double*)(var->sqldata)));
             break;
-        case IISQ_CHA_TYPE:
-            PerlIO_printf(DBILOGFP, ", var: '%s'\n",
-                var->sqldata);
+        case IISQ_VCH_TYPE:
+        case IISQ_VBYTE_TYPE:
+            PerlIO_printf(DBILOGFP, ", var: '");
+            PerlIO_write(DBILOGFP, var->sqldata, var->sqllen);
+            PerlIO_printf(DBILOGFP, "'\n");
+            break;
+        case IISQ_HDLR_TYPE:
+            PerlIO_printf(DBILOGFP, ", var: long type\n");
             break;
         default:
             PerlIO_printf(DBILOGFP, ", unknown type: %d\n",
@@ -316,6 +321,10 @@ dbd_db_login(dbh, imp_dbh, dbname, user, pass)
             if (!sql_check(dbh)) return 0;
         }
     }
+
+    /* Set default value for LongReadLen */
+    DBIc_LongReadLen(imp_dbh) = 2UL * 1024 * 1024 * 1024;
+
     return 1;
 }
 
@@ -510,8 +519,8 @@ dbd_db_STORE_attrib(dbh, imp_dbh, keysv, valuesv)
       int transaction_state, autocommit_state;
       EXEC SQL END DECLARE SECTION;
       EXEC SQL SELECT INT4(DBMSINFO('AUTOCOMMIT_STATE')),
-	INT4(DBMSINFO('TRANSACTION_STATE'))
-	INTO :autocommit_state, :transaction_state;
+	              INT4(DBMSINFO('TRANSACTION_STATE'))
+	 INTO :autocommit_state, :transaction_state;
       if (dbis->debug >= 3)
 	PerlIO_printf(DBILOGFP,
 		      "DBD::Ingres::dbd_db_STORE(AUTOCOMMIT=%d, TRANSACTION=%d)sqlca=%d\n",
@@ -575,9 +584,9 @@ dbd_db_FETCH_attrib(dbh, imp_dbh, keysv)
 		      "DBD::Ingres::dbd_db_FETCH(AUTOCOMMIT=%d, TRANSACTION=%d)sqlca=%d\n",
 		      autocommit_state, transaction_state, sqlca.sqlcode);
       DBIc_set(imp_dbh, DBIcf_AutoCommit, autocommit_state);
-      retsv = newSVsv(boolSV(autocommit_state));
-      cacheit = FALSE;   /* Don't cache AutoCommit state - some
-			    /* fool^H^H^H^Huser may change it via SQL */
+      retsv = sv_2mortal(newSVsv(boolSV(autocommit_state)));
+      cacheit = FALSE;    /* Don't cache AutoCommit state - some
+			  ** fool^H^H^H^Huser may change it via SQL */
       if (transaction_state == 0) {
 	EXEC SQL COMMIT;
       }
@@ -587,21 +596,13 @@ dbd_db_FETCH_attrib(dbh, imp_dbh, keysv)
         return Nullsv;
 
     if (cacheit) { /* cache for next time (via DBI quick_FETCH) */
-        hv_store((HV*)SvRV(dbh), key, kl, retsv, 0);
+        if (hv_store((HV*)SvRV(dbh), key, kl, retsv, 0) != NULL)
+                SvREFCNT_inc(retsv);
     }
     return (retsv);
 }
 
 /* === DBD_ST ======================================================= */
-
-int hash(char *s) {
-    int h = 0;
-    while (*s) {
-        h += (unsigned char)(*s);
-        s++;
-    }
-    return h;
-}
 
 int
 dbd_st_prepare(sth, imp_sth, statement, attribs)
@@ -641,10 +642,6 @@ dbd_st_prepare(sth, imp_sth, statement, attribs)
         if (dbis->debug >= 4)
             PerlIO_printf(DBILOGFP, "Statement3 = %s \n", p);
         generate_statement_name(&imp_sth->st_num, name);
-        /*imp_sth->st_num = hash(statement);
-        if (dbis->debug >= 4)
-            PerlIO_printf(DBILOGFP, "Num = %d \n", imp_sth->st_num);
-        sprintf(name, "s%d", imp_sth->st_num);*/
         if (dbis->debug >= 4)
             PerlIO_printf(DBILOGFP, "Name = %s \n", name);
         n = name + strlen(name); /* points at \0 at end */
@@ -714,7 +711,8 @@ dbd_st_prepare(sth, imp_sth, statement, attribs)
           
           for (param_no=0; param_no < param_max; param_no++) {
             var = &imp_sth->ph_sqlda.sqlvar[param_no];
-            var->sqldata = (char *) &sv_undef;
+	    var->sqltype = 0;
+            var->sqldata = 0;
             var->sqllen  = 0;
           }
         }
@@ -729,7 +727,152 @@ dbd_st_prepare(sth, imp_sth, statement, attribs)
     return 1;
 }
 
-int
+/* Get handler function for getting long types. This is called
+ * by Ingres when a select is done on a long varchar or long byte field. */
+static int
+dbd_get_handler(imp_fbh_t *fbh)
+{
+EXEC SQL BEGIN DECLARE SECTION;
+    int data_end;
+    long size_read;
+    char buf[HANDLER_READ_SIZE];
+    long max_to_read = sizeof(buf);
+EXEC SQL END DECLARE SECTION;
+    STRLEN offset, data_len, trunc_len;
+    char *data;
+    D_imp_sth(fbh->sth);
+
+    /* We allocate memory as needed to hold the data, in chunks of
+     * HANDLER_READ_SIZE length.  We never read more than trunc_len
+     * bytes */
+
+    trunc_len = DBIc_LongReadLen(imp_sth);
+
+    /* This could save us a bit of I/O when the user asks for the
+     * data to be truncated at a length less than HANDLER_READ_SIZE.
+     * We need to read 1 extra so we know when we really have truncated. */
+    if (max_to_read > trunc_len + 1)
+        max_to_read = trunc_len + 1;
+
+    /* We can use indic as the truncated indicator, because Ingres tells
+     * us that the get handler is not called at all when the data is null.
+     * Settings: 0=good, 1=truncated, -1=null */
+    fbh->indic = 0;
+    offset = 0;
+
+    do {
+        /* You must call GET DATA at least once no matter what. */
+        EXEC SQL GET DATA (:buf = segment,
+                           :size_read = segmentlength,
+                           :data_end = dataend)
+            WITH MAXLENGTH = :max_to_read;
+
+        if (!sql_check(fbh->sth)) {
+            SvOK_off(fbh->sv);
+            EXEC SQL ENDDATA;
+            return 0;
+        }
+
+        if (offset + size_read > trunc_len) {
+            /* we've read the maximum, time to truncate. */
+            size_read = trunc_len - offset;
+            fbh->indic = 1;
+            data_end = 1;
+            EXEC SQL ENDDATA;
+        }
+
+#if 0
+        /* This looks tidy, but sv_grow does tricks with PV offsets that
+         * mean we often end up allocating almost twice as much memory.
+         * Obviously for long data types that isn't a good idea. */
+        data = SvGROW(fbh->sv, offset + size_read + 1);
+#else
+        data = SvPV(fbh->sv, data_len);
+        if (data_len < offset + size_read + 1) {
+            data = SvPVX(fbh->sv);
+            data_len = offset + size_read + 1;
+            /* We probably should expose a setting to allow user-tunable
+             * sizes for extending the memory alloc by.  Perhaps a
+             * $dbh->{LongChunkSize} or similar. */
+            Renew(data, data_len, char);
+            SvPV_set(fbh->sv, data);
+            SvLEN_set(fbh->sv, data_len);
+        }
+#endif
+        memcpy(data + offset, buf, size_read);
+        offset += size_read;
+    } while (data_end == 0);
+
+    /* Terminating with an extra null byte doesn't hurt binary data
+     * because the recorded length is still right. */
+    data[offset] = '\0';
+    SvCUR_set(fbh->sv, offset);
+
+    /* if LongReadLen is 0 return undef/null (from DBI spec) */
+    if (trunc_len == 0) {
+        SvOK_off(fbh->sv);
+        fbh->indic = -1;
+    }
+
+    /* The return value from the datahandler is ignored by Ingres. */
+    return 0;
+}
+
+
+/* Put handler function for putting long types. This is called
+ * by Ingres when an insert is done on a long varchar or long byte
+ * field using a type-specified SQL_LONGVARCHAR or SQL_LONGVARBINARY
+ * bind param. */
+static int
+dbd_put_handler(SV *sv)
+{
+EXEC SQL BEGIN DECLARE SECTION;
+    int data_end, chunk;
+    char *cp, *data;
+EXEC SQL END DECLARE SECTION;
+    STRLEN length, offset;
+
+    /* Data to put is in arg->sv. */
+    data = SvPV(sv, length);
+
+    offset = 0;
+    data_end = 0;
+
+    /* This loop is not necessary with the current setup where we
+     * just write the whole buffer in one, but we could reduce
+     * the chunk size later if it turned out to be useful. */
+    do {
+        cp = data + offset;
+        chunk = length - offset;
+        data_end = 1;
+
+        /* You must call PUT DATA at least once.  For 0 bytes you must
+         * call it once with segmentlength = 0. */
+        EXEC SQL PUT DATA (segment = :cp,
+                           segmentlength = :chunk,
+                           dataend = :data_end);
+
+        offset += chunk;
+    } while (offset < length);
+
+    return 1;
+}
+
+/*
+ * dbd_describe is called when a statement is executed that will fetch
+ * fields, and is responsible for allocating memory in the individual
+ * imp_fbh_t structures and setting up the IISQLVAR stuff so that
+ * Ingres can fetch the data.
+ *
+ * When destroying an sth we need to free all this stuff if
+ * imp_sth->done_desc != 0.
+ *
+ * This uses perl SVs to hold the string data types because it's
+ * convenient to use perl's memory management which keeps track of
+ * lengths etc.
+ *
+ */
+static int
 dbd_describe(sth, imp_sth)
      SV *sth;
      imp_sth_t *imp_sth;
@@ -750,11 +893,12 @@ dbd_describe(sth, imp_sth)
     imp_sth->done_desc = 1;
 
     /* describe the statement and allocate bufferspace */
-    Newz(42, imp_sth->fbh, DBIc_NUM_FIELDS(imp_sth) + 1, imp_fbh_t);
+    Newz(42, imp_sth->fbh, DBIc_NUM_FIELDS(imp_sth), imp_fbh_t);
     for (i = 0; i < sqlda->sqld; i++)
     {
         imp_fbh_t *fbh = &imp_sth->fbh[i];
         IISQLVAR *var = fbh->var = &sqlda->sqlvar[i];
+	fbh->sth = sth;
         fbh->nullable = var->sqltype < 0;
         fbh->origtype = var->sqltype = abs(var->sqltype);
         fbh->origlen = var->sqllen;
@@ -763,41 +907,71 @@ dbd_describe(sth, imp_sth)
         if (dbis->debug >= 3)
             PerlIO_printf(DBILOGFP, "  field %d, type=%d\n", 1, var->sqltype);
             
+        /* We use perl SVs as buffers, but they are not real SVs and we
+         * don't bother setting all the type flags etc., we just use them
+         * for the memory management.  These SVs should not be used as
+         * SVs and definitely not passed back to perl at any stage. */
+
         switch (var->sqltype) {
         case IISQ_INT_TYPE:
+            var->sqltype = IISQ_INT_TYPE;
             fbh->len = var->sqllen = sizeof(int);
             strcpy(fbh->type, "d");
-            Newz(42, fbh->var_ptr.iv, 1, int);
-            var->sqldata = (char*)fbh->var_ptr.iv;
-            fbh->sv = NULL;
+            fbh->sv = newSV((STRLEN)fbh->len);
+            SvOK_off(fbh->sv);
+            var->sqldata = SvPVX(fbh->sv);
             break;
         case IISQ_MNY_TYPE: /* money - treat as float8 */
         case IISQ_DEC_TYPE: /* decimal */
         case IISQ_FLT_TYPE:
-            fbh->len = var->sqllen = sizeof(double);
             var->sqltype = IISQ_FLT_TYPE;
+            fbh->len = var->sqllen = sizeof(double);
             strcpy(fbh->type, "f");
-            Newz(42, fbh->var_ptr.nv, 1, double);
-            var->sqldata = (char*)fbh->var_ptr.nv;
-            fbh->sv = NULL;
+            fbh->sv = newSV((STRLEN)fbh->len);
+            SvOK_off(fbh->sv);
+            var->sqldata = SvPVX(fbh->sv);
             break;
         case IISQ_DTE_TYPE:
             var->sqllen = IISQ_DTE_LEN;
             /* FALLTHROUGH */
         case IISQ_CHA_TYPE:
-        case IISQ_VCH_TYPE:
+        case IISQ_BYTE_TYPE:
         case IISQ_TXT_TYPE:
-            var->sqltype = IISQ_CHA_TYPE;
+        case IISQ_VCH_TYPE:
+        case IISQ_VBYTE_TYPE:
+            var->sqltype = IISQ_VCH_TYPE;
+            fbh->len = var->sqllen;
             strcpy(fbh->type, "s");
-            /* set up bufferspace */
-            fbh->len = var->sqllen+1;
-            fbh->sv = newSV((STRLEN)fbh->len);
-            (void)SvUPGRADE(fbh->sv, SVt_PV);
-            SvREADONLY_on(fbh->sv);
-            (void)SvPOK_only(fbh->sv);
-            var->sqldata = (char*)SvPVX(fbh->sv);
-            fbh->var_ptr.pv = var->sqldata;
+            /* Need an extra byte for null termination later. */
+            fbh->sv = newSV((STRLEN)fbh->len + 1 + sizeof(short));
+            SvOK_off(fbh->sv);
+            var->sqldata = SvPVX(fbh->sv);
             break;
+        case IISQ_LVCH_TYPE:
+        case IISQ_LBYTE_TYPE: {
+            IISQLHDLR *hdlr;
+
+            var->sqltype = IISQ_HDLR_TYPE;
+            fbh->len = 0;
+            var->sqllen = 0;
+            strcpy(fbh->type, "l");
+
+            /* OK, I lied above.  These ones ARE real SVs.
+             * Memory with long data types is alloced in dbd_get_handler. */
+            fbh->sv = newSV(0);
+            SvUPGRADE(fbh->sv, SVt_PV);
+            SvREADONLY_on(fbh->sv);
+            SvPOK_only(fbh->sv);
+
+            /* Set up dbd_get_handler to read the data, having it passed
+             * fbh so it knows where to store things and can give back
+             * some status info. */
+            Newz(42, hdlr, 1, IISQLHDLR);
+            hdlr->sqlarg = (char *)fbh;
+            hdlr->sqlhdlr = dbd_get_handler;
+
+            var->sqldata = (char *)hdlr;
+            break; }
         default:        /* oh dear! */
             croak("DBD::Ingres: field %d has unsupported type %d\n",
                   i+1, var->sqltype);
@@ -827,6 +1001,10 @@ dbd_describe(sth, imp_sth)
 }
 
 
+/*
+ * Note that this allocates var->sqldata which needs to be freed.  Also,
+ * we cannot reference a value that isn't SvOK or we get a warning.
+ */
 int
 dbd_bind_ph (sth, imp_sth, param, value, sql_type, attribs, is_inout, maxlen)
     SV *sth;
@@ -841,7 +1019,6 @@ dbd_bind_ph (sth, imp_sth, param, value, sql_type, attribs, is_inout, maxlen)
     int param_no;
     int type = 0;  /* 1: int, 2: float, 3: string */
     IISQLVAR* var;
-    int* buf;
     
     if (SvNIOK(param) ) {   /* passed as a number   */
         param_no = (int)SvIV(param);
@@ -861,7 +1038,14 @@ dbd_bind_ph (sth, imp_sth, param, value, sql_type, attribs, is_inout, maxlen)
         imp_sth->ph_sqlda.sqld = param_no;
 
     var = &imp_sth->ph_sqlda.sqlvar[param_no-1];
-    buf = ((int *) var->sqldata)-1;
+
+    /* Need to unref the previous "value" if this var was used with a put
+     * handler before. */
+    if (var->sqltype == IISQ_HDLR_TYPE) {
+        IISQLHDLR *hdlr = (IISQLHDLR *)var->sqldata;
+        SvREFCNT_dec((SV *)hdlr->sqlarg);
+    }
+
     if (sql_type) {
         switch (sql_type) {
         case SQL_INTEGER:
@@ -874,9 +1058,14 @@ dbd_bind_ph (sth, imp_sth, param, value, sql_type, attribs, is_inout, maxlen)
         case SQL_DECIMAL:
             type = 2; break;
         case SQL_CHAR:
+        case SQL_BINARY:
         case SQL_VARCHAR:
+        case SQL_VARBINARY:
 	case SQL_DATE:
             type = 3; break;
+        case SQL_LONGVARCHAR:
+        case SQL_LONGVARBINARY:
+            type = 4; break;
 	default:
 	    croak("DBD::Ingres::bind_param: Unknown TYPE: %d, param_no %d",
 		sql_type, param_no);
@@ -893,81 +1082,79 @@ dbd_bind_ph (sth, imp_sth, param, value, sql_type, attribs, is_inout, maxlen)
     }
     if (dbis->debug >= 3)
         PerlIO_printf(DBILOGFP, "  type=%d\n", type);
-    switch (type) {
-      /* Poor mans memory management: We store the actual length of
-         the buffer one int below var->sqldata. */
-    case 1: {/* int */
-        if (var->sqldata == (char *)&sv_undef) {
-            Newz(42, buf, 2, int);
-            *buf = 2;
-            var->sqldata = (char*) (buf+1);
-        } else if (*buf < 2) {
-            Renew(buf, 2, int);
-            *buf = 2;
-            var->sqldata = (char*) (buf+1);
-        }
-        buf[1]       = (int)SvIV(value);
-        var->sqlind  = 0;
-        var->sqllen  = 4;
-        var->sqltype = IISQ_INT_TYPE;
-        break; }
-    case 2: {/* float */
-        int    need_int = (sizeof(double) + sizeof(int)-1)/sizeof(int) +1;
-        double ptr;
 
-        if (var->sqldata == (char *)&sv_undef) {
-            Newz(42, buf, need_int, int);
-            *buf = need_int;
-            var->sqldata = (char*) (buf+1);
-        } else if (*buf < need_int) {
-            Renew(buf, need_int, int);
-            *buf = need_int;
-            var->sqldata = (char*) (buf+1);
-        }
-        ptr = (double)SvNV(value);
-        /* Double probably not aligned properly: may cause alignment
-           error in Ingres library? Hmm: works for Open Ingres 1.2 and
-           Ingres 6.4. Should we spend 8 bytes for the length tag? */
-        Move(&ptr, buf+1, 1, double); 
-        var->sqlind  = 0;
-        var->sqllen = 8;
+    var->sqlind  = 0;
+    switch (type) {
+        /* This used to have a kind of poor mans memory management, but
+         * it seems using Renew() each time to change the size of
+         * the buffer is just as fast and much easier because you
+         * don't have to worry about the 0 case. */
+    case 1: /* int */
+        var->sqltype = IISQ_INT_TYPE;
+        var->sqllen = sizeof(int);
+        Renew(var->sqldata, var->sqllen, char);
+        if (SvOK(value))
+            *(int *)var->sqldata = (int)SvIV(value);
+        break;
+    case 2: /* float */
         var->sqltype = IISQ_FLT_TYPE;
-        break; }
+        var->sqllen = sizeof(double);
+        Renew(var->sqldata, var->sqllen, char);
+        if (SvOK(value))
+            *(double *)var->sqldata = (double)SvNV(value);
+        break;
     case 3: {/* string */
-        STRLEN strlen;
-        char   *string  = SvPV(value,strlen);
-        int    need_int = ((strlen+1)*sizeof(char) + sizeof(int)-1) /
-                                      sizeof(int) + 1;
-        
-        if (var->sqldata == (char *)&sv_undef) { /* initital allocation */
-            Newz(42, buf, need_int, int);
-            *buf = need_int;
-            var->sqldata = (char *) (buf+1);
+        STRLEN len;
+        char *string;
+
+        var->sqltype = IISQ_VCH_TYPE;
+        if (SvOK(value)) {
+            string = SvPV(value, len);
         } else {
-            buf = ((int *) var->sqldata)-1; 
-            if (*buf < need_int) { /* need to reallocate? */
-                Renew(buf, need_int, int);
-                *buf = need_int;
-                var->sqldata = (char *) (buf+1);
-            }
+            string = 0;
+            len = 0;
         }
-        Move(string, var->sqldata, strlen+1, char);
-        var->sqlind  = 0;
-        var->sqllen  = strlen;
-        var->sqltype = IISQ_CHA_TYPE;
+        var->sqllen = len;
+        Renew(var->sqldata, len + sizeof(short), char);
+        if (SvOK(value)) {
+            *(short *)var->sqldata = (short)len;
+            Copy(string, var->sqldata + sizeof(short), len, char);
+        }
+
+        /* This works around a bug in Ingres where inserting byte fields
+         * as IISQ_VCH_TYPE fails if the strings ends in a \0.  It works
+         * if we use VBYTE_TYPE, but we can't default to that as you
+         * cannot use it to insert dates. */
+        if (sql_type == SQL_BINARY)
+            var->sqltype = IISQ_VBYTE_TYPE;
+
+        break; }
+    case 4: { /* blob */
+        IISQLHDLR *hdlr;
+
+        var->sqltype = IISQ_HDLR_TYPE;
+        Renew(var->sqldata, sizeof(IISQLHDLR), char);
+        hdlr = (IISQLHDLR *)var->sqldata;
+
+        /* We pass the SV itself as the argument to the put handler.
+         * The value is thus evaluated at execute time, not now
+         * at bind time.
+         *
+         * XXX: make sure the refcount is decremented any time this
+         *      allocation is removed: reuse (above); destroy. */
+        SvREFCNT_inc(value);
+        hdlr->sqlarg = (char *)value;
+        hdlr->sqlhdlr = dbd_put_handler;
+        var->sqllen = 0;
         break; }
     }
+
     if (!SvOK(value)) {
+        /* !SvOK means binding a NULL */
         if (dbis->debug >= 3) PerlIO_printf(DBILOGFP, "bind(NULL)");
-        if (var->sqldata == (char *)&sv_undef) {
-          Newz(42, buf, 2, int);
-          *buf = 2;
-          var->sqldata = (char*) (buf+1);
-        } else if (*buf < 2) {
-          Renew(buf, 2, int);
-          *buf = 2;
-          var->sqldata = (char*) (buf+1);
-        }
+
+        /* We don't renew here, on the assumption that all of the
+         * data types above allocate space >= sizeof(short). */
         var->sqlind = (short*)var->sqldata; /* cheat a little - use
                                             ** var->sqldata as indicator
                                             ** variable as well - the
@@ -1121,32 +1308,44 @@ dbd_st_fetch(sth, imp_sth)
             case 'd':
                 sv_setiv(sv, (IV)*(int*)var->sqldata);
                 if (dbis->debug >= 3)
-                    PerlIO_printf(DBILOGFP, "Int: %ld %d %d\n",
-                          SvIV(sv), fbh->var_ptr.iv, *(int*)var->sqldata);
+                    PerlIO_printf(DBILOGFP, "Int: %ld %d\n",
+                          SvIV(sv), *(int*)var->sqldata);
                 break;
             case 'f':
                 sv_setnv(sv, *(double*)var->sqldata);
                 if (dbis->debug >= 3)
                     PerlIO_printf(DBILOGFP, "Double: %lf\n", SvNV(sv));
                 break;
-            case 's':
-                SvCUR(fbh->sv) = fbh->len;
-                SvPVX(fbh->sv)[fbh->len-1] = 0;
+            case 's': {
+                short len = *(short *)var->sqldata;
+                char *buf = var->sqldata + sizeof(short);
                 /* strip trailing blanks */
                 if ((fbh->origtype == IISQ_DTE_TYPE ||
                      fbh->origtype == IISQ_CHA_TYPE ||
                      fbh->origtype == IISQ_TXT_TYPE)
                  && DBIc_has(imp_sth, DBIcf_ChopBlanks)) {
-                    for (ch = fbh->len - 2;
-                         SvPVX(fbh->sv)[ch] == ' ';
-                         --ch)
-                             SvPVX(fbh->sv)[ch] = 0;
+                    while (len > 0 && buf[len-1] == ' ') {
+                        len--;
+                    }
+                }
+                buf[len] = '\0';
+                sv_setpvn(sv, buf, len);
+                if (dbis->debug >= 3) {
+                    PerlIO_printf(DBILOGFP, "Text: '");
+                    PerlIO_write(DBILOGFP, buf, len);
+                    PerlIO_printf(DBILOGFP, "', Chop: %d\n",
+                        DBIc_has(imp_sth, DBIcf_ChopBlanks));
+                }
+                break; }
+            case 'l':
+                if (!DBIc_has(imp_sth, DBIcf_LongTruncOk) && fbh->indic == 1) {
+                    (void)SvOK_off(sv);
+                    error(sth, -7, "Data size larger than LongReadLen", 0);
+                    return Nullav;
                 }
                 sv_setsv(sv, fbh->sv);
-                SvCUR(sv) = strlen(SvPVX(sv));
                 if (dbis->debug >= 3)
-                    PerlIO_printf(DBILOGFP, "Text: '%s', Chop: %d\n",
-                        SvPVX(sv), DBIc_has(imp_sth, DBIcf_ChopBlanks));
+                    PerlIO_printf(DBILOGFP, "Long data (%d)\n", SvCUR(sv));
                 break;
             default:
                 croak("DBD::Ingres: wierd field-type '%s' in field no. %d?\n",
@@ -1216,7 +1415,28 @@ dbd_st_destroy(sth, imp_sth)
 
     release_statement(imp_sth->st_num);
 
-    /* XXX free contents of imp_sth here */
+    for (i=0; i<DBIc_NUM_PARAMS(imp_sth); ++i) {
+        IISQLVAR *var = &imp_sth->ph_sqlda.sqlvar[i];
+        if (var->sqldata != 0) {
+            if (var->sqltype == IISQ_HDLR_TYPE) {
+                IISQLHDLR *hdlr = (IISQLHDLR *)var->sqldata;
+                SvREFCNT_dec((SV *)hdlr->sqlarg);
+            }
+            Safefree(var->sqldata);
+        }
+    }
+
+    if (imp_sth->done_desc) {
+        IISQLDA* sqlda = &imp_sth->sqlda;
+        for (i=0; i<sqlda->sqld; i++) {
+            imp_fbh_t *fbh = &imp_sth->fbh[i];
+            SvREFCNT_dec(fbh->sv);
+            if (fbh->type[0] == 'l')
+                Safefree(fbh->var->sqldata);
+        }
+        Safefree(imp_sth->fbh);
+    }
+    Safefree(imp_sth->name);
 
     DBIc_IMPSET_off(imp_sth);
 }
@@ -1319,6 +1539,18 @@ dbd_st_FETCH_attrib(sth, imp_sth, keysv)
             case IISQ_VCH_TYPE:
                 type = SQL_VARCHAR;
                 break;
+            case IISQ_BYTE_TYPE:
+                type = SQL_BINARY;
+                break;
+            case IISQ_VBYTE_TYPE:
+                type = SQL_VARBINARY;
+                break;
+	    case IISQ_LVCH_TYPE:
+		type = SQL_LONGVARCHAR;
+		break;
+	    case IISQ_LBYTE_TYPE:
+		type = SQL_LONGVARBINARY;
+		break;
             default:        /* oh dear! */
                 type = 0;
                 break;
@@ -1371,6 +1603,10 @@ dbd_st_FETCH_attrib(sth, imp_sth, keysv)
             case IISQ_CHA_TYPE:
             case IISQ_TXT_TYPE:
             case IISQ_VCH_TYPE:
+            case IISQ_BYTE_TYPE:
+            case IISQ_VBYTE_TYPE:
+            case IISQ_LBYTE_TYPE:
+            case IISQ_LVCH_TYPE:
                 len = imp_sth->fbh[i].origlen;
                 break;
             default:        /* oh dear! */

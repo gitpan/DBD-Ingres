@@ -1,4 +1,4 @@
-# $Id: //depot/tilpasninger/dbd-ingres/Ingres.pm#15 $ $DateTime: 2003/07/09 12:59:23 $ $Revision: #15 $
+# $Id: //depot/tilpasninger/dbd-ingres/Ingres.pm#14 $ $DateTime: 2003/07/03 17:04:55 $ $Revision: #14 $
 #
 #   Copyright (c) 1996-2000 Henrik Tougaard
 #
@@ -22,7 +22,7 @@ DBD::Ingres - DBI driver for Ingres database systems
     $dbh->commit
     $dbh->rollback
     $dbh->disconnect
-    and many more
+    ...and many more
 
 =cut
 
@@ -34,8 +34,8 @@ DBD::Ingres - DBI driver for Ingres database systems
     use DynaLoader ();
     @ISA = qw(DynaLoader);
 
-    $VERSION = '0.39';
-    my $Revision = substr(q$Change: 14501 $, 8)/100;
+    $VERSION = '0.50';
+    my $Revision = substr(q$Change: 14429 $, 8)/100;
 
     bootstrap DBD::Ingres $VERSION;
 
@@ -179,22 +179,42 @@ DBD::Ingres - DBI driver for Ingres database systems
                 MINIMUM_SCALE   => 13,
                 MAXIMUM_SCALE   => 14,
     	    },
-    	    [ 'SHORT',   DBI::SQL_SMALLINT, undef, "","",  undef,
-    	        1, 0, 2, 0, 0,0,undef,0,0 ],
-    	    [ 'INTEGER', DBI::SQL_INTEGER, undef, "","",   "size=1,2,4",
-    	        1, 0, 2, 0, 0,0,undef,0,0 ],
-    	    [ 'MONEY',   DBI::SQL_DECIMAL, undef, "","",   undef,
-    	        1, 0, 2, 0, 1,0,undef,0,0 ],
-    	    [ 'FLOAT',   DBI::SQL_INTEGER, undef, "","",   "size=4,8",
-    	        1, 0, 2, 0, 0,0,undef,0,0 ],
-    	    [ 'DATE',    DBI::SQL_DATE,    undef, "'","'", undef,
-    	        1, 0, 3, 0, 0,0,undef,0,0 ],
-    	    [ 'DECIMAL', DBI::SQL_DECIMAL, undef, "","",   "precision,scale",
-    	        1, 0, 2, 0, 0,0,undef,0,0 ],
-    	    [ 'VARCHAR', DBI::SQL_VARCHAR, undef, "'","'", "max length",
-    	        1, 1, 3, 0, 0,0,undef,0,0 ],
-    	    [ 'CHAR',    DBI::SQL_CHAR,    undef, "'","'", "length",
-    	        1, 1, 3, 0, 0,0,undef,0,0 ],
+    	    [ 'SMALLINT',     DBI::SQL_SMALLINT,
+	      undef, "","",  undef,
+    	      1, 0, 2, 0, 0, 0, undef, 0, 0 ],
+    	    [ 'INTEGER',      DBI::SQL_INTEGER,
+	      undef, "","",   "size=1,2,4",
+    	      1, 0, 2, 0, 0 ,0 ,undef ,0 ,0 ],
+    	    [ 'MONEY',        DBI::SQL_DECIMAL,
+	      undef, "","",   undef,
+    	      1, 0, 2, 0, 1, 0, undef, 0, 0 ],
+    	    [ 'FLOAT',        DBI::SQL_DOUBLE,
+	      undef, "","",   "size=4,8",
+    	      1, 0, 2, 0, 0, 0, undef, 0, 0 ],
+    	    [ 'DATE',         DBI::SQL_DATE,   
+	      undef, "'","'", undef,
+    	      1, 0, 3, 0, 0, 0, undef, 0, 0 ],
+    	    [ 'DECIMAL',      DBI::SQL_DECIMAL,
+	      undef, "","",   "precision,scale",
+    	      1, 0, 2, 0, 0, 0, undef, 0, 0 ],
+    	    [ 'VARCHAR',      DBI::SQL_VARCHAR,
+	      undef, "'","'", "max length",
+    	      1, 1, 3, 0, 0, 0, undef, 0, 0 ],
+    	    [ 'BYTE VARYING', DBI::SQL_VARBINARY,
+	      undef, "'","'", "max length",
+    	      1, 1, 3, 0, 0, 0, undef, 0, 0 ],
+    	    [ 'CHAR',         DBI::SQL_CHAR,   
+	      undef, "'","'", "length",
+    	      1, 1, 3, 0, 0, 0, undef, 0, 0 ],
+    	    [ 'BYTE',         DBI::SQL_BINARY, 
+	      undef, "'","'", "length",
+    	      1, 1, 3, 0, 0, 0, undef, 0, 0 ],
+    	    [ 'LONG VARCHAR', DBI::SQL_LONGVARCHAR, 
+	      undef, undef, undef, undef,
+    	      1, 1, 0, 0, 0, 0, undef, 0, 0 ],
+    	    [ 'LONG BYTE', DBI::SQL_LONGVARBINARY, 
+	      undef, undef, undef, undef,
+    	      1, 1, 0, 0, 0, 0, undef, 0, 0 ],
     	];
     	return $ti;
     }
@@ -210,22 +230,73 @@ DBD::Ingres - DBI driver for Ingres database systems
 
 =head1 DESCRIPTION
 
-DBD::Ingres is an extension to Perl which allows access to Ingres
-databases. It is built on top of the standard DBI extension an
-implements the methods that DBI require.
+DBD::Ingres is a database driver for the perl DBI system that allows
+access to Ingres databases. It is built on top of the standard DBI
+extension and implements the methods that DBI requires.
 
 This document describes the differences between the "generic" DBD and
 DBD::Ingres.
 
-=head2 Extensions/Changes
+=head1 EXTENSIONS/CHANGES
+
+=head2 Connect
+
+  DBI->connect("DBI:Ingres:dbname[;options]");
+  DBI->connect("DBI:Ingres:dbname[;options]", user [, password]);
+  DBI->connect("DBI:Ingres:dbname[;options]", user [, password], \%attr);
+
+To use DBD::Ingres call C<connect> specifying a I<datasource> option beginning
+with I<"DBI:Ingres:">, followed by the database instance name and
+optionally a semi-colon followed by any Ingres connect options.
+
+Options must be given exactly as they would be given in an ESQL-connect
+statement, i.e., separated by blanks.
+
+The connect call will result in a connect statement like:
+
+  CONNECT dbname IDENTIFIED BY user PASSWORD password OPTIONS=options
+
+E.g.,
 
 =over 4
 
-=item returned types
+=item *
+
+local database
+
+  DBI->connect("DBI:Ingres:mydb", "me", "mypassword")
+
+=item *
+
+with options and no password
+
+  DBI->connect("DBI:Ingres:mydb;-Rmyrole/myrolepassword", "me")
+
+=item *
+
+Ingres/Net database
+
+  DBI->connect("DBI:Ingres:thatnode::thisdb;-xw -l", "him", "hispassword")
+
+=back
+
+and so on.
+
+=head2 AutoCommit Defaults to ON
+
+B<Important>: The DBI spec defines that AutoCommit is B<ON> after connect.
+This is the opposite of the normal Ingres default.
+
+It is recommended that the C<connect> call ends with the attributes
+C<{ AutoCommit =E<gt> 0 }>.
+
+=head2 Returned Types
 
 The DBI docs state that:
 
-=over 2
+=over 4
+
+=item *
 
 Most data is returned to the perl script as strings (null values are
 returned as undef).  This allows arbitrary precision numeric data to be
@@ -238,18 +309,27 @@ This is B<not> the case for Ingres.
 
 Data is returned as it would be to an embedded C program:
 
-=over 2
+=over 4
+
+=item *
 
 Integers are returned as integer values (IVs in perl-speak).
 
+=item *
+
 Floats and doubles are returned as numeric values (NVs in perl-speak).
+
+=item *
 
 Dates, moneys, chars, varchars and others are returned as strings
 (PVs in perl-speak).
 
 =back
 
-=item get_dbevent
+This does not cause loss of precision, because the Ingres API uses
+these types to return the data anyway.
+
+=head2 get_dbevent
 
 This non-DBI method calls C<GET DBEVENT> and C<INQUIRE_INGRES> to
 fetch a pending database event. If called without argument a blocking
@@ -270,67 +350,53 @@ See F<t/event.t> for an example of usage.
     printf "%-20s = '%s'\n", $_, $event_ref->{$_};
   }
 
-=item connect
+=head2 do
 
-    connect(dbi:Ingres:dbname[;options] [, user [, password]])
+$dbh->do is implemented as a call to 'EXECUTE IMMEDIATE' with all the
+limitations that this implies.
 
-Options to the connection are passed in the datasource
-argument. This argument should contain the database name possibly
-followed by a semicolon and the database options.
+Placeholders and binding are not supported with C<$dbh-E<gt>do>.
 
-Options must be given exactly as they would be given an ESQL-connect
-statement, ie. separated by blanks.
+=head2 Binary Data
 
-The connect call will result in a connect statement like:
+Fetching binary data from char and varchar fields is not guaranteed
+to work, but probably will most of the time.  Use 'BYTE' or
+'BYTE VARYING' data types in your database for full binary data support.
 
-    CONNECT dbname IDENTIFIED BY user PASSWORD password OPTIONS=options
+=head2 Long Data Types
 
-Eg.
+DBD::Ingres supports the LONG VARCHAR and LONG BYTE data types
+as detailed in L<DBI/"Handling BLOB / LONG / Memo Fields">.
+
+The default value for LongReadLen in DBD::Ingres is 2GB, the maximum
+size of a long data type field.  DBD::Ingres dynamically allocates
+memory for long data types as required, so setting LongReadLen to a
+large value does not waste memory.
+
+In summary:
 
 =over 4
 
-=item local database
+=item *
 
-       connect("mydb", "me", "mypassword")
+When inserting blobs, use bind variables with types specified.
 
-=item with options and no password
+=item *
 
-       connect("mydb;-Rmyrole/myrolepassword", "me")
+When fetching blobs, set LongReadLen and LongTruncOk in the $dbh.
 
-=item Ingres/Net database
+=item *
 
-       connect("thatnode::thisdb;-xw -l", "him", "hispassword")
+Blob fields are returned as undef if LongReadLen is 0.
 
 =back
 
-and so on.
+Due to their size (and hence the impracticality of copying them inside
+the DBD driver), variables bound as blob types are always evaluated at
+execute time rather than bind time. (Similar to bind_param_inout, except
+you don't pass them as references.)
 
-B<Important>: The DBI spec defines that AutoCommit is B<ON> after connect.
-This is the opposite of the normal Ingres default.
-
-It is recommended that the C<connect> call ends with the attributes
-C<{ AutoCommit => 0 }>.
-
-If you dont want to check for errors after B<every> call use 
-C<{ AutoCommit => 0, RaiseError => 1 }> instead. This will C<die> with
-an error message if any DBI call fails.
-
-=item do
-
-    $dbh->do
-
-This is implemented as a call to 'EXECUTE IMMEDIATE' with all the
-limitations that this implies.
-
-Placeholders and binding is not supported with C<$dbh-E<gt>do>.
-
-=item ChopBlanks and binary data
-
-Fetching of binary data is not possible if ChopBlanks is set. ChopBlanks
-uses a \0 character internally to mark the end of the field, so returned
-will be truncated at the first \0 character.
-
-=item ing_readonly
+=head2 ing_readonly
 
 Normally cursors are declared C<READONLY> 
 to increase speed. READONLY cursors don't create
@@ -351,42 +417,43 @@ the C<$dbh-E<gt>prepare> calls includes the attribute C<{ing_readonly =E<gt> 0}>
 
 =back
 
-Eg.
+E.g.,
 
-   $sth = $dbh->prepare("select ....", {ing_readonly => 0});
+  $sth = $dbh->prepare("select ....", {ing_readonly => 0});
 
 will be opened for update, as will
 
-   $sth = $dbh->prepare("select .... for direct update of ..")
+  $sth = $dbh->prepare("select .... for direct update of ..")
 
 while
 
-   $sth = $dbh->prepare("select .... for direct update of ..",
-                { ing_readonly => 1} );
+  $sth = $dbh->prepare("select .... for direct update of ..",
+                       { ing_readonly => 1} );
 
 will be opened C<FOR READONLY>.
 
 When you wish to actually do the update, where you would normally put the
 cursor name, you put:
 
-    $sth->{CursorName}
+  $sth->{CursorName}
 
 instead,  for example:
 
-    $sth = $dbh->prepare("select a,b,c from t for update of b");
-    $sth->execute;
-    $row = $sth->fetchrow_arrayref;
-    $dbh->do("update t set b='1' where current of $sth->{CursorName}");
+  $sth = $dbh->prepare("select a,b,c from t for update of b");
+  $sth->execute;
+  $row = $sth->fetchrow_arrayref;
+  $dbh->do("update t set b='1' where current of $sth->{CursorName}");
 
 Later you can reexecute the statement without the update-possibility by doing:
 
-    $sth->{ing_readonly} = 1;
-    $sth->execute;
+  $sth->{ing_readonly} = 1;
+  $sth->execute;
 
 and so on. B<Note> that an C<update> will now cause an SQL error.
 
-In fact the "FOR UPDATE" seems to be optional, ie you can update cursors even 
-if their SELECT statements do not contain a C<for update> part.
+In fact the "FOR UPDATE" seems to be optional, i.e., you can update
+cursors even if their SELECT statements do not contain a C<for update>
+part.
 
 If you wish to update such a cursor you B<must> include the C<ing_readonly>
 attribute.
@@ -394,19 +461,16 @@ attribute.
 B<NOTE> DBD::Ingres version later than 0.19_1 have opened all cursors for
 update. This change breaks that behaviour. Sorry if this breaks your code.
 
-=item ing_statement
+=head2 ing_statement
 
-    $sth->{ing_statement}             ($)
+This has long been deprecated in favor of C<$sth-E<gt>{Statement}>,
+which is a DBI standard.
 
-Contains the text of the SQL-statement. Used mainly for debugging.
+$sth->{ing_statement} provides access to the SQL statement text.
 
-This is B<exactly> the same as the new and DBI-supported
-C<$sth-E<gt>{Statement}>
-and B<the use of C<$sth-E<gt>{ing_statement}> is depreceated>.
+=head2 ing_types
 
-=item ing_types
-
-    $sth->{ing_types}              (\@)
+  $sth->{ing_types}              (\@)
 
 Returns an array of the "perl"-type of the return fields of a select
 statement.
@@ -417,7 +481,7 @@ The types are represented as:
 
 =item 'i': integer
 
-All integer types, ie. int1, int2 and int4.
+All integer types, i.e., int1, int2 and int4.
 
 These values are returned as integers. This should not cause loss of
 precision as the internal Perl integer is at least 32 bit long.
@@ -431,49 +495,87 @@ of precision, but that would occur anyway whenever an application
 referred to the data (all Ingres tools fetch these values as
 floating-point numbers)
 
+=item 'l': long / blob
+
+Either of the two long datatypes, long varchar or long byte.
+
 =item 's': string
 
-All other supported types, ie. char, varchar, text, date etc.
+All other supported types, i.e., char, varchar, text, date etc.
 
 =back
 
-=item TYPE
+=head2 Ingres Types and their DBI Equivalents
 
-    $sth->TYPE                       (\@)
+  $sth->TYPE                       (\@)
 
-See the DBI-docs for a description.
-
-The ingres translations are:
+See L<DBI> for a description.  The Ingres translations are:
 
 =over 4
 
-=item short -> DBI::SQL_SMALLINT
+=item *
 
-=item int -> DBI::SQL_INTEGER
+short -> DBI::SQL_SMALLINT
 
-=item float -> DBI::SQL_DOUBLE
+=item *
 
-=item double -> DBI::SQL_DOUBLE
+int -> DBI::SQL_INTEGER
 
-=item char -> DBI::SQL_CHAR
+=item *
 
-=item text -> DBI::SQL_CHAR
+float -> DBI::SQL_DOUBLE
 
-=item varchar -> DBI::SQL_VARCHAR
+=item *
 
-=item date -> DBI::SQL_DATE
+double -> DBI::SQL_DOUBLE
 
-=item money -> DBI::SQL_DECIMAL
+=item *
 
-=item decimal -> DBI::SQL_DECIMAL
+char -> DBI::SQL_CHAR
+
+=item *
+
+text -> DBI::SQL_CHAR
+
+=item *
+
+byte -> DBI::SQL_BINARY
+
+=item *
+
+varchar -> DBI::SQL_VARCHAR
+
+=item *
+
+byte varying -> DBI::SQL_VARBINARY
+
+=item *
+
+date -> DBI::SQL_DATE
+
+=item *
+
+money -> DBI::SQL_DECIMAL
+
+=item *
+
+decimal -> DBI::SQL_DECIMAL
+
+=item *
+
+long varchar -> DBI::SQL_LONGVARCHAR
+
+=item *
+
+long byte -> DBI::SQL_LONGVARBINARY
 
 =back
 
 Have I forgotten any?
 
-=item ing_lengths
+=head2 ing_lengths
 
-    $sth->{ing_lengths}              (\@)
+  $sth->{ing_lengths}              (\@)
 
 Returns an array containing the lengths of the fields in Ingres, eg. an
 int2 will return 2, a varchar(7) 7 and so on.
@@ -481,12 +583,12 @@ int2 will return 2, a varchar(7) 7 and so on.
 Note that money and date fields will have length returned as 0.
 
 C<$sth-E<gt>{SqlLen}> is the same as C<$sth-E<gt>{ing_lengths}>,
-but the use of it is depreceated.
+but the use of it is deprecated.
 
-See also the C$sth-E<gt>{PRECISION}> field in the DBI docs. This returns
+See also the C<$sth-E<gt>{PRECISION}> field in the DBI docs. This returns
 a 'reasonable' value for all types including money and date-fields.
 
-=item ing_sqltypes
+=head2 ing_sqltypes
 
     $sth->{ing_sqltypes}              (\@)
 
@@ -498,24 +600,19 @@ C<$sth-E<gt>{NULLABLE}>.
 
 See also the C$sth-E<gt>{TYPE}> field in the DBI docs.
 
-=back
+=head1 FEATURES NOT IMPLEMENTED
 
-=head2 Not implemented
+=head2 state
 
-=over 4
+  $h->state                (undef)
 
-=item state
+SQLSTATE is not implemented.
 
-    $h->state                (undef)
-
-SQLSTATE is not implemented yet. It is planned for the (not so) near
-future.
-
-=item disconnect_all
+=head2 disconnect_all
 
 Not implemented
 
-=item commit and rollback invalidates open cursors
+=head2 commit and rollback invalidate open cursors
 
 DBD::Ingres should warn when a commit or rollback is isssued on a $dbh
 with open cursors.
@@ -524,7 +621,7 @@ Possibly a commit/rollback should also undef the $sth's. (This should
 probably be done in the DBI-layer as other drivers will have the same
 problems).
 
-After a commit or rollback the cursors are all ->finish'ed, ie. they
+After a commit or rollback the cursors are all ->finish'ed, i.e., they
 are closed and the DBI/DBD will warn if an attempt is made to fetch
 from them.
 
@@ -532,28 +629,26 @@ A future version of DBD::Ingres wil possibly re-prepare the statement.
 
 This is needed for
 
-=item Cached statements
+=head2 Cached statements
 
 A new feature in DBI that is not implemented in DBD::Ingres.
 
-=item Procedure calls
+=head2 bind_param_inout (Procedure calls)
 
-It is not possible to call database procedures from DBD::Ingres.
+It is possible to call database procedures from DBD::Ingres. It is B<NOT>
+possible to get return values from the procedure.
 
 A solution is underway for support for procedure calls from the DBI.
 Until that is defined procedure calls can be implemented as a
 DB::Ingres-specific function (like L<get_event>) if the need arises and
 someone is willing to do it.
 
-=item OpenIngres new features
+=head2 OpenIngres new features
 
-The new features of OpenIngres are not (yet) supported in DBD::Ingres.
-
-This includes BLOBS and spatial datatypes.
+Some new features of OpenIngres are not (yet) supported in DBD::Ingres,
+including spatial datatypes.
 
 Support will be added when the need arises - if you need it you add it ;-)
-
-=back
 
 =head1 NOTES
 
@@ -561,7 +656,7 @@ I wonder if I have forgotten something?
 
 =head1 SEE ALSO
 
-The DBI documentation in L<DBI>.
+The DBI documentation in L<DBI> and L<DBI::DBD>.
 
 =head1 AUTHORS
 

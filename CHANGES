@@ -1,7 +1,35 @@
-$Id: //depot/tilpasninger/dbd-ingres/CHANGES#16 $ $DateTime: 2003/07/09 12:59:23 $ $Author: ht000 $
-v0.39       2003.07.09
- -added posix4 lib to the list of libraries for Solaris, thanks to
-  "Mulcahy, Damien" <dmulcahy@revenue.ie>
+$Id: //depot/tilpasninger/dbd-ingres/CHANGES#15 $ $DateTime: 2003/07/03 17:04:55 $ $Author: ht000 $
+v0.50     2003.09.15
+ All changes due to Mike Battersby <mib@unimelb.edu.au>
+ - add missing long datatype info into the attribute fetching.
+ - add missing BYTE and BYTE VARYING type details to the POD.
+ - fix another small memory leak of imp_sth->name when destroying a
+   statement handle.
+ - implement support for LONG VARCHAR and LONG BYTE data types, including
+   dynamically allocating the memory for them.
+ - add tests for long and binary behavior into t/dbi.t.
+ - add t/datatypes.t for more thorough testing of support for each
+   datatype in type_info_all.
+ - fix memory leak in attribute fetch by decrementing the ref count on
+   the created SV.
+ - increment the ref count when we put an SV into the dbh cache so we
+   don't access freed memory later (never hit because we don't cache
+   our only attribute, AutoCommit, anyway).
+ - don't allocate 1 extra imp_fbh_t in dbd_describe for no reason.
+ - use perl SVs for buffer management in dbd_describe and remove
+   the var_ptr field in the imp_sth_t.
+ - vastly simplify the memory management in bind_ph by using Renew
+   all the time instead of the home-brew memory manager.
+ - use IISQ_VCH_TYPE for all character types
+ - support BYTE and BYTE VARYING data types now that strings use
+   IISQL_VCH_TYPE and don't rely on nul termination.
+ - actually free the allocated statement data in dbd_st_destroy and
+   stop leaking memory like a sieve.
+ - don't access undef bind values (used for binding nulls), so we
+   protect against invalid memory access and stop perl from warning
+   us about referencing them.
+ - fix up some formatting in the POD documentation, re-work a couple
+   of sections and examples, and add some info about binary data types.
 v0.38       2003.07.03
  -Tim Bunce <Tim.Bunce@pobox.com> came with the correct solution to the
   $dbh->do and $dbh->{Statement} problem.

@@ -3,7 +3,7 @@
 #   col2 char(2)
 # );
 use DBI qw(:sql_types);
-our $num_test;
+my $num_test;
 
 $verbose = 1 unless defined $verbose;
 my $testtable = "testhththt";
@@ -52,7 +52,7 @@ sub connect_db($$) {
  	if $verbose;
     my $dbh = DBI->connect($dbname, "", "",
 	{ AutoCommit => 0,
-	  PrintError => !$ENV{HARNESS_ACTIVE},
+	  PrintError => 0
         });
     $dbh->{ChopBlanks} = 1;
     if ($dbh) {

@@ -1,5 +1,5 @@
 #!/usr/local/bin/perl -sw
-# $Id: //depot/tilpasninger/dbd-ingres/Makefile.PL#5 $
+# $Id: //depot/tilpasninger/dbd-ingres/Makefile.PL#4 $
 
 require 5.004;
 
@@ -127,9 +127,9 @@ if ($Is_VMS) {
        unless -x $ESQLC;
 }
 
-# Solaris needs some extra libraries
+# Solaris needs the elf-library
 if ($Config{osname} eq 'solaris') {
-    $linkwith .= " -lelf -lposix4";
+    $linkwith .= " -lelf";
 }
 
 # HP-UX cannot link a non-PIC object file into a shared library.
@@ -174,7 +174,7 @@ $opts{depend} = { "dbdimp\$(OBJ_EXT)" => "dbdimp.c Ingres.h",
 		  "Ingres\$(OBJ_EXT)" => "Ingres.h",
                 };
 $opts{clean} = { FILES => "dbdimp.c dbdimp.sc Ingres.h Ingres.sc Ingres.xsi" };
-$opts{macro} = { ESQLC => $ESQLC, ESQLCOPT => "-o.h" };
+$opts{macro} = { ESQLC => $ESQLC, ESQLCOPT => "-o.h -w -p" };
 $opts{DEFINE} = '-DOPENINGRES' if $OpenIngres;
 WriteMakefile(%opts);
 
