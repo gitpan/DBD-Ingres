@@ -1,5 +1,5 @@
 #
-# $Id: Ingperl.pm,v 2.103 1997/11/21 08:30:15 ht Exp $
+# $Id: Ingperl.pm,v 2.104 1998/11/08 15:42:22 ht000 Exp $
 #
 # Ingperl emulation interface for DBD::Ingres
 #
@@ -17,7 +17,7 @@ use DBI 0.73;
 use Exporter;
 use Carp;
 
-$VERSION = substr(q$Revision: 2.103 $, 10);
+$VERSION = substr(q$Revision: 2.104 $, 10);
 
 @ISA = qw(Exporter);
 
@@ -26,8 +26,10 @@ $VERSION = substr(q$Revision: 2.103 $, 10);
     &sql_types &sql_ingtypes &sql_lengths &sql_nullable &sql_names
     $sql_version $sql_error $sql_sqlcode $sql_rowcount $sql_readonly
     $sql_showerrors $sql_debug
-    $sql_drh $sql_dbh $sql_sth
     &sql_eval_row1 &sql_eval_col1
+);
+@EXPORT_OK = qw(
+    $sql_drh $sql_dbh $sql_sth
 );
 
 use strict;

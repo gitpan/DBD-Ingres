@@ -1,4 +1,4 @@
-#   $Id: Ingres.pm,v 2.114 1998/02/05 13:59:36 ht000 Exp $
+#   $Id: Ingres.pm,v 2.115 1998/11/08 15:42:22 ht000 Exp $
 #
 #   Copyright (c) 1994,1995 Tim Bunce
 #             (c) 1996 Henrik Tougaard
@@ -30,12 +30,12 @@ DBD::Ingres - Ingres access interface for Perl5
 {
     package DBD::Ingres;
 
-    use DBI 0.91;
+    use DBI 1.00;
     use DynaLoader ();
     @ISA = qw(DynaLoader);
 
-    $VERSION = '0.16';
-    my $Revision = substr(q$Revision: 2.114 $, 10);
+    $VERSION = '0.19_1';
+    my $Revision = substr(q$Revision: 2.115 $, 10);
 
     bootstrap DBD::Ingres $VERSION;
 
@@ -50,7 +50,6 @@ DBD::Ingres - Ingres access interface for Perl5
         $class .= "::dr";
 
         # not a 'my' since we use it above to prevent multiple drivers
-
         $drh = DBI::_new_drh($class, {
             'Name' => 'Ingres',
             'Version' => $VERSION,
@@ -61,7 +60,6 @@ DBD::Ingres - Ingres access interface for Perl5
 
         $drh;
     }
-
     1;
 }
 
@@ -99,10 +97,10 @@ DBD::Ingres - Ingres access interface for Perl5
     }
 
     sub data_sources {
-	my ($drh) = @_;
-	warn("\$drh->data_sources() not defined for Ingres\n")
-	    if $drh->{"warn"};
-	"";
+        my ($drh) = @_;
+        warn("\$drh->data_sources() not defined for Ingres\n")
+            if $drh->{"warn"};
+        "";
     }
 
 }
@@ -113,8 +111,8 @@ DBD::Ingres - Ingres access interface for Perl5
 
     sub do {
         my($dbh, $statement, $attribs, @params) = @_;
-        Carp::carp "\$dbh->do() attribs unused\n" if $attribs;
-	Carp::carp "\$dbh->do() params unused\n" if @params;
+        Carp::carp "DBD::Ingres::\$dbh->do() attribs unused\n" if $attribs;
+        Carp::carp "DBD::Ingres::\$dbh->do() params unused\n" if @params;
         DBD::Ingres::db::_do($dbh, $statement);
     }
 
@@ -126,20 +124,73 @@ DBD::Ingres - Ingres access interface for Perl5
             'ing_statement' => $statement,
             });
 
-        if ($statement !~ m/\b[Ss][Ee][Ll][Ee][Cc][Tt]\b/) {
-	    $attribs->{"ing_outerjoin"} =
-	      $statement =~ m/\b[Ll][Ee][Ff][Tt]\s*[Jj][Oo][Ii][Nn]\b/s ||
-	      $statement =~ m/\b[Rr][Ii][Gg][Hh][Tt]\s*[Jj][Oo][Ii][Nn]\b/s ||
-	      $statement =~ m/\b[Oo][Uu][Tt][Ee][Rr]\s*[Jj][Oo][Ii][Nn]\b/s
-                 unless defined $attribs->{"ing_outerjoin"};
-	}
-
         DBD::Ingres::st::_prepare($sth, $statement, $attribs)
             or return undef;
 
         $sth;
     }
 
+    sub table_info {
+        my ($dbh) = @_;
+        my $sth = $dbh->prepare("
+          SELECT null, table_owner, table_name, 'TABLE'
+          FROM IITABLES
+          WHERE table_type ='T'
+          UNION
+          SELECT null, table_owner, table_name, 'VIEW'
+          FROM IITABLES
+          WHERE table_type ='V'");
+        return unless $sth;
+        $sth->execute;
+        $sth;
+    }
+
+    sub ping {
+        my($dbh) = @_;
+        # we know that DBD::Ingres prepare does a describe so this will
+        # actually talk to the server and is this a valid and cheap test.
+        return 1 if $dbh->prepare("select * from iitables");
+        return 0;
+    }
+
+    sub type_info_all {
+    	my ($dbh) = @_;
+    	my $ti = [
+    	    {   TYPE_NAME       => 0,
+                DATA_TYPE       => 1,
+                PRECISION       => 2,
+                LITERAL_PREFIX  => 3,
+                LITERAL_SUFFIX  => 4,
+                CREATE_PARAMS   => 5,
+                NULLABLE        => 6,
+                CASE_SENSITIVE  => 7,
+                SEARCHABLE      => 8,
+                UNSIGNED_ATTRIBUTE=> 9,
+                MONEY           => 10,
+                AUTO_INCREMENT  => 11,
+                LOCAL_TYPE_NAME => 12,
+                MINIMUM_SCALE   => 13,
+                MAXIMUM_SCALE   => 14,
+    	    },
+    	    [ 'SHORT',   DBI::SQL_SMALLINT, undef, "","",  undef,
+    	        1, 0, 2, 0, 0,0,undef,0,0 ],
+    	    [ 'INTEGER', DBI::SQL_INTEGER, undef, "","",   "size=1,2,4",
+    	        1, 0, 2, 0, 0,0,undef,0,0 ],
+    	    [ 'MONEY',   DBI::SQL_DECIMAL, undef, "","",   undef,
+    	        1, 0, 2, 0, 1,0,undef,0,0 ],
+    	    [ 'FLOAT',   DBI::SQL_INTEGER, undef, "","",   "size=4,8",
+    	        1, 0, 2, 0, 0,0,undef,0,0 ],
+    	    [ 'DATE',    DBI::SQL_DATE,    undef, "'","'", undef,
+    	        1, 0, 3, 0, 0,0,undef,0,0 ],
+    	    [ 'DECIMAL', DBI::SQL_DECIMAL, undef, "","",   "precision,scale",
+    	        1, 0, 2, 0, 0,0,undef,0,0 ],
+    	    [ 'VARCHAR', DBI::SQL_VARCHAR, undef, "'","'", "max length",
+    	        1, 1, 3, 0, 0,0,undef,0,0 ],
+    	    [ 'CHAR',    DBI::SQL_CHAR,    undef, "'","'", "length",
+    	        1, 1, 3, 0, 0,0,undef,0,0 ],
+    	];
+    	return $ti;
+    }
 }
 
 
@@ -162,6 +213,34 @@ DBD::Ingres.
 =head2 Extensions/Changes
 
 =over 4
+
+=item returned types
+
+The DBI docs state that:
+
+=over 2
+
+Most data is returned to the perl script as strings (null values are
+returned as undef).  This allows arbitrary precision numeric data to be
+handled without loss of accuracy.  Be aware that perl may not preserve
+the same accuracy when the string is used as a number.
+
+=back
+
+This is B<not> the case for Ingres.
+
+Data is returned as it would be to an embedded C program:
+
+=over 2
+
+Integers are returned as integer values (IVs in perl-speak).
+
+Floats and doubles are returned as numeric values (NVs in perl-speak).
+
+Dates, moneys, chars, varchars and others are returned as strings
+(PVs in perl-speak).
+
+=back
 
 =item get_dbevent
 
@@ -227,32 +306,15 @@ limitations that this implies.
 
 Placeholders and binding is not supported with C<$dbh-E<gt>do>.
 
-=item prepare and outerjoins
-
-Due to a bug in OpenIngres 1.2 there is no way of determining which
-fields in an 'outerjoin'select are nullable.
-
-Therefore all fields in outerjoin selects are deemed NULLABLE.
-
-DBD::Ingres tries to determine is a select statement is an outerjoin by
-(primitively) parsing the select statement. You can override this
-parsing by adding an attribute to the select-call:
-
-    $dbh-E<gt>prepare($statement, %attribs)
-
-C<$attribs{"ing_outerjoin"}> should contain true for outerjoins and false
-otherwise.
-
-Eg:
-
-    $sth = $dbh->prepare("select...left join...", { ing_outerjoin => 1 });
-    $sth = $dbh->prepare("select...", { ing_outerjoin => 0 });
-
 =item ing_statement
 
     $sth->{ing_statement}             ($)
 
 Contains the text of the SQL-statement. Used mainly for debugging.
+
+This is B<exactly> the same as the new and DBI-supported
+C<$sth-E<gt>{Statement}>
+and the use of C<$sth-E<gt>{ing_statement}> is depreceated.
 
 =item ing_types
 
@@ -287,6 +349,40 @@ All other supported types, ie. char, varchar, text, date etc.
 
 =back
 
+=item TYPE
+
+    $sth->TYPE                       (\@)
+
+See the DBI-docs for a description.
+
+The ingres translations are:
+
+=over 4
+
+=item short -> DBI::SQL_SMALLINT
+
+=item int -> DBI::SQL_INTEGER
+
+=item float -> DBI::SQL_DOUBLE
+
+=item double -> DBI::SQL_DOUBLE
+
+=item char -> DBI::SQL_CHAR
+
+=item text -> DBI::SQL_CHAR
+
+=item varchar -> DBI::SQL_VARCHAR
+
+=item date -> DBI::SQL_DATE
+
+=item money -> DBI::SQL_DECIMAL
+
+=item decimal -> DBI::SQL_DECIMAL
+
+=back
+
+Have I forgotten any?
+
 =item ing_lengths
 
     $sth->{ing_lengths}              (\@)
@@ -299,6 +395,9 @@ Note that money and date fields will have length returned as 0.
 C<$sth-E<gt>{SqlLen}> is the same as C<$sth-E<gt>{ing_lengths}>,
 but the use of it is depreceated.
 
+See also the C$sth-E<gt>{PRECISION}> field in the DBI docs. This returns
+a 'reasonable' value for all types including money and date-fields.
+
 =item ing_sqltypes
 
     $sth->{ing_sqltypes}              (\@)
@@ -308,6 +407,8 @@ are given as documented in the Ingres SQL Reference Manual.
 
 All values are positive as the nullability of the field is returned in
 C<$sth-E<gt>{NULLABLE}>.
+
+See also the C$sth-E<gt>{TYPE}> field in the DBI docs.
 
 =back
 
@@ -322,23 +423,6 @@ C<$sth-E<gt>{NULLABLE}>.
 SQLSTATE is not implemented yet. It is planned for the (not so) near
 future.
 
-=item ping
-
-    $dbh->ping;
-
-Not yet implemented - on the ToDo list.
-
-=item updateable cursors
-
-It should be possible to do something like this:
-
-    $sth = $dbh->prepare("select a,b,c from t", ing_update => "b, c");
-    $sth->execute;
-    $row = $sth->fetchrow_arrayref;
-    $dbh->do("update t set b='1' where current of $sth->{CursorName}");
-
-The exact syntax is open for discussion (you implement => you decide!).
-
 =item disconnect_all
 
 Not implemented
@@ -351,6 +435,18 @@ with open cursors.
 Possibly a commit/rollback should also undef the $sth's. (This should
 probably be done in the DBI-layer as other drivers will have the same
 problems).
+
+After a commit or rollback the cursors are all ->finish'ed, ie. they
+are closed and the DBI/DBD will warn if an attempt is made to fetch
+from them.
+
+A future versiob of DBD::Ingres wil possibly re-prepare the statement.
+
+This is needed for
+
+=item Cached statements
+
+A new feature in DBI that is not implemented in DBD::Ingres.
 
 =item Procedure calls
 
@@ -365,7 +461,7 @@ someone is willing to do it.
 
 The new features of OpenIngres are not (yet) supported in DBD::Ingres.
 
-This includes BLOBS, decimal datatype and spatial datatypes.
+This includes BLOBS and spatial datatypes.
 
 Support will be added when the need arises - if you need it you add it ;-)
 

@@ -1,7 +1,7 @@
 #ifndef DBDIMP_H
 #define DBDIMP_H
 /*
-   $Id: Ingres.sh,v 2.103 1997/09/25 11:46:36 ht000 Exp $
+   $Id: Ingres.sh,v 2.104 1998/11/08 15:42:22 ht000 Exp $
 
    Copyright (c) 1994,1995  Tim Bunce
    Copyright (c) 1996,1997  Henrik Tougaard (ht@datani.dk)
@@ -19,6 +19,11 @@
 EXEC SQL INCLUDE SQLDA;
 EXEC SQL INCLUDE SQLCA;
 
+#ifndef IISQ_DEC_TYPE
+/* For 6.4 users, that don't have DECIMAL */
+#define IISQ_DEC_TYPE -9999
+#endif
+
 typedef struct imp_fbh_st imp_fbh_t;
 
 struct imp_drh_st {
@@ -30,23 +35,25 @@ struct imp_drh_st {
 struct imp_dbh_st {
     dbih_dbc_t com;         /* MUST be first element in structure   */
     int        session;     /* session id for this connection */
+    imp_sth_t *sth_lst;     /* pointer to first statement in chain */
 };
 
 /* Define sth implementor data structure */
 struct imp_sth_st {
     dbih_stc_t com;         /* MUST be first element in structure   */
+    imp_sth_t *next_sth;    /* pointer to next sth in chain */
+    int        invalid;     /* 1 if preparation is invalidated by
+                            **   commit/rollback */
 
     IISQLDA    sqlda;       /* descriptor for statement (select) */
     char      *name;        /* statement name!!! */
     int        st_num;      /* statement number */
     int        done_desc;   /* have we described this sth yet ?	*/
     IISQLDA    ph_sqlda;    /* descriptor for placeholders */
-    int        outerjoin;   /* true if this statement possibly is an
-                               outerjoin select */
-    imp_fbh_t *fbh;	    /* array of imp_fbh_t structs	*/
+    imp_fbh_t *fbh;	        /* array of imp_fbh_t structs	*/
 };
 
-struct imp_fbh_st { 	    /* field buffer EXPERIMENTAL */
+struct imp_fbh_st { 	    /* field buffer */
     imp_sth_t *imp_sth;	    /* 'parent' statement */
 
     /* Ingres description of the field	*/
@@ -69,6 +76,8 @@ struct imp_fbh_st { 	    /* field buffer EXPERIMENTAL */
 
 /* DBD::Ingres extensions */
 SV*     dbd_db_get_dbevent _((SV *dbh, imp_dbh_t *imp_dbh, SV *wait));
+
+
 #ifdef xxyyxxyyxxyyxx_ht
 #define dbd_db_get_dbevent      ing_db_get_dbevent
 

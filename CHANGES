@@ -1,3 +1,57 @@
+V0.19_1     1998.10.14
+  This is the first test of the forthcoming release 0.20. This is not
+  for public consumption - please use with care.
+
+  Do please report any problem to me <ht@datani.dk>.
+  
+  - Don't export $sql_dbh etc as default. (Ingperl.pm)
+    Warning:
+       This may break code that uses one or more of:
+          $sql_drh $sql_dbh $sql_sth $sql_debug $sql_rowcount
+       Change:
+          use Ingperl;
+       to:
+          use Ingperl( qw[ $sql_dbh $sql_sth ] );
+  - Added support for updateable cursors (experimental), Thanks to
+    Dirk Koopman <djk@tobit.co.uk>.
+  - Upgrade to support DBI 1.00 (experimental):
+     . re-prepare statement, that have gone out of scope (eq. after a
+       commit/rollback etc). Just first bash at it :-(, ie. for now just
+       keep tabs on whether the statement is invalidated by commit.
+     . add the new meta-data fields (TYPE, SCALE, PRECISION)
+       Ingres doesn't return the SCALE information so that is undef untill
+       further notice!
+     . first bash at type_info_all
+     . added $dbh->table_info (so $dbh->tables also works thanks to DBI)
+     . added $dbh->ping
+  - Changed statement name from stmnt<12-digit-number> to
+    st<number>_<a-bit-of-the-select>, so that it maybe is possible to
+    see which statement is executing from eg. ipm.
+    This may have the adverse effect that Ingres runs out of buffer space,
+    because it leaves all prepared statements in the ???-buffer untill a
+    commit. This will only be a problem if you execute many different
+    statements in a transaction.
+    If this does become a problem please let me know. One solution is to
+    allow the user to define the statement name if neccessary (eg. though
+    the %attribs argument to prepare).
+  - Cleaned up some code here and there.
+  - OpenIngres 1.0 now requires patch 5301 (or later) as this fixes the
+    unfortunate problem with nullability and outerjoins. The code to work
+    around this problem is removed (it had strange sideeffects at times).
+    This should not be a problem for OpenIngres 2.0 or later.
+    It if definitely not a problem for Ingres 6.4; as outerjoins were
+    introduced in OpenIngres.
+####  - Now builds cleanly on NT without changes to the makefile.
+####  - Now builds cleanly on VMS (again)
+  - Now commits after inquiring for autocommit-state after connect. This
+    removes the nedd for the commit in:
+        $dbh = DBI->connect...
+        $dbh->commit;
+        $dbh->do("set lockmode....");
+
+(Note #### = Not Yet Implemented)
+
+
 V0.16     1998.02.05
   - Ulrich Pfeifer found and fixed another couple of memory leaks.
   - Called dbd_st_finish when dbd_st_fetch returns undef. This avoid the bug

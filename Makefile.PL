@@ -1,7 +1,7 @@
 #!/usr/local/bin/perl -sw
-# $Id: Makefile.PL,v 2.108 1998/02/05 13:53:36 ht000 Exp $
+# $Id: Makefile.PL,v 2.109 1998/11/08 15:42:22 ht000 Exp $
 
-require 5.003_93;
+require 5.004;
 
 use ExtUtils::MakeMaker 5.38, qw(&WriteMakefile $Verbose);
 use Getopt::Long;
@@ -15,7 +15,7 @@ require FileHandle unless defined(&FileHandle::new);
 # For those not using Dynamic loading this means building a
 # new static perl in the DBI directory by saying 'make perl'
 # and then using _that_ perl to make this one.
-use DBI 0.89;
+use DBI 1.00;
 use DBI::DBD;
 my $Is_VMS = $Config{osname} eq 'VMS';
 
@@ -32,11 +32,13 @@ my %opts = (
 # Options, typically only used for debugging
 $::opt_g = '';		# enable debugging (s/-O/-g/g)
 $::opt_v = 0;		# be verbose
+$::opt_o = 0;           # OpenIngres or not
 
-GetOptions('v!', 'g!') or die "Invalid arguments";
+GetOptions('v!', 'g!', 'o!') or die "Invalid arguments";
 
 $::opt_g &&= '-g';	# convert to actual string
 $Verbose ||= $::opt_v;
+my $OpenIngres= $::opt_o;
 
 # --- Introduction
 
@@ -77,7 +79,11 @@ for ($linkwith) {
 }
 
 # Try to figure out if this is an OpenIngres or not
-my $OpenIngres = defined(-f "$II_SYSTEM/ingres/lib/libcompat.1.so");
+unless (defined $OpenIngres) {
+    $OpenIngres = defined(-f "$II_SYSTEM/ingres/lib/libcompat.1.so");
+    print "OpenIngres detected\n" if $OpenIngres;
+}
+
 
 my $linkopt = "";
 
@@ -126,6 +132,8 @@ if ($Config{osname} eq 'hpux') {
 print "System: perl$] @Config{qw(myuname)}\n",
       "Compiler: @Config{qw(cc optimize ccflags)}\n",
       "SQL-precompiler: $ESQLC\n",
+      "II_SYSTEM: $II_SYSTEM",
+	  ($OpenIngres ? ", OpenIngres\n" : "Ingres 6.4\n"),
       "Linkwith: '$linkwith'\n" if $Verbose;
 
 print "\n";
@@ -205,22 +213,22 @@ $(BASEEXT).xsi: $(DBI_DRIVER_XST)
 {   # If perl Makefile.PL *-g* then switch on debugging
     package MY; # SUPER needs package context, $self is not sufficient
     sub const_cccmd {
-	my($self) = shift;
-	local($_) = $self->SUPER::const_cccmd(@_);
-	return $_ unless $::opt_g;
-	if ($::Is_VMS) {
-	    s!/[Oo][Pp][Tt][Ii]?[a-zA-Z]*!/NOOPTIMIZE/DEBUG!;
-	} else {
-	    s/\s-O\d?\b/ -g/g;
-	}
-	$_;
+        my($self) = shift;
+        local($_) = $self->SUPER::const_cccmd(@_);
+        return $_ unless $::opt_g;
+        if ($::Is_VMS) {
+            s!/[Oo][Pp][Tt][Ii]?[a-zA-Z]*!/NOOPTIMIZE/DEBUG!;
+        } else {
+            s/\s-O\d?\b/ -g/g;
+        }
+        $_;
     }
     sub dynamic_lib { # This affects only VMS
-	my ($self) = shift;
-	local($_) = $self->SUPER::dynamic_lib(@_);
-	return $_ unless $::Is_VMS;
-	s!perlshr_attr.opt/Option!perlshr_attr.opt/Option,$linkopt!;
-	$_;
+        my ($self) = shift;
+        local($_) = $self->SUPER::dynamic_lib(@_);
+        return $_ unless $::Is_VMS;
+        s!perlshr_attr.opt/Option!perlshr_attr.opt/Option,$linkopt!;
+        $_;
     };
 
 }
