@@ -1,5 +1,5 @@
 /*                               -*- Mode: C -*- 
- * $Id: dbdimp.psc,v 2.113 1999/05/25 09:53:07 ht000 Exp $
+ * $Id: dbdimp.psc,v 2.114 1999/09/16 14:49:53 ht000 Exp $
  *
  * Copyright (c) 1994,1995  Tim Bunce
  *           (c) 1996,1997  Henrik Tougaard
@@ -631,7 +631,7 @@ dbd_st_prepare(sth, imp_sth, statement, attribs)
         *n++ = '_';
         if (dbis->debug >= 4)
             fprintf(DBILOGFP, "Name2 = %s \n", n);
-        while (*p && n < (name+24)) {
+        while (*p && n < (name+23)) {
             if (isalnum(*p)) {
                 *n++ = *p;
             }

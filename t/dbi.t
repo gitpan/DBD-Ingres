@@ -69,7 +69,7 @@ ok(0, $dbh->do("INSERT INTO $testtable VALUES(1, 'Alligator Descartes')"),
 ok(0, $dbh->do("DELETE FROM $testtable WHERE id = 1"),
      "Delete", 1);
 
-ok(0, $cursor = $dbh->prepare("SELECT * FROM $testtable WHERE id = ?"),
+ok(0, $cursor = $dbh->prepare("SELECT * FROM $testtable WHERE id = ? ORDER BY id"),
      "prepare(Select)", 1);
 ok(0, $cursor->bind_param(1, 1, {TYPE => SQL_INTEGER}),
      "Bind param 1 as 1", 1);

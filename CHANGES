@@ -1,3 +1,7 @@
+v0.21       1999.09.16
+  It seems that a statement name can only be 23 characters long in Ingres 6.4
+  Fixed, thanks to Bruce W. Hoylman <bhoylma@advtech.uswest.com>.
+
 v0.20       1999.09.01
   This has been running without problems on several machines here for some
   months now. Time to release it and see what (if anything) breaks.
