@@ -1,4 +1,4 @@
-#   $Id: Ingres.pm,v 2.104 1997/09/15 07:45:21 ht000 Exp $
+#   $Id: Ingres.pm,v 2.107 1997/09/25 11:46:36 ht000 Exp $
 #
 #   Copyright (c) 1994,1995 Tim Bunce
 #             (c) 1996 Henrik Tougaard
@@ -30,14 +30,12 @@ DBD::Ingres - Ingres access interface for Perl5
 {
     package DBD::Ingres;
 
-    use DBI ();
+    use DBI 0.90;
     use DynaLoader ();
     @ISA = qw(DynaLoader);
 
-    $VERSION = '0.05_93';
-    my $Revision = substr(q$Revision: 2.104 $, 10);
-
-    require_version DBI 0.82;
+    $VERSION = '0.05_96';
+    my $Revision = substr(q$Revision: 2.107 $, 10);
 
     bootstrap DBD::Ingres $VERSION;
 
@@ -85,7 +83,14 @@ DBD::Ingres - Ingres access interface for Perl5
             warn("II_SYSTEM not set. Ingres may fail\n")
             	if $drh->{Warn};
         }
+        unless (-d "$ENV{'II_SYSTEM'}/ingres") {
+            warn("No ingres directory in \$II_SYSTEM. Ingres may fail\n")
+            	if $drh->{Warn};
+        }
 
+        $user = "" unless defined $user;
+        $auth = "" unless defined $auth;
+        
         # Connect to the database..
         DBD::Ingres::db::_login($this, $dbname, $user, $auth)
             or return undef;
@@ -107,14 +112,22 @@ DBD::Ingres - Ingres access interface for Perl5
     }
 
     sub prepare {
-        my($dbh, $statement, @attribs)= @_;
+        my($dbh, $statement, $attribs)= @_;
 
         # create a 'blank' sth
         my $sth = DBI::_new_sth($dbh, {
             'ing_statement' => $statement,
             });
 
-        DBD::Ingres::st::_prepare($sth, $statement, @attribs)
+        if ($statement !~ m/\bselect\b/i) {
+		$attribs->{"ing_outerjoin"} =
+		      $statement =~ m/\bleft\s*join\b/is ||
+		      $statement =~ m/\bright\s*join\b/is ||
+		      $statement =~ m/\bouter\s*join\b/is
+			unless defined $attribs->{"ing_outerjoin"};
+	}
+
+        DBD::Ingres::st::_prepare($sth, $statement, $attribs)
             or return undef;
 
         $sth;
@@ -139,36 +152,30 @@ implements the methods that DBI require.
 This document describes the differences between the "generic" DBD and
 DBD::Ingres.
 
-=head2 Not implemented
-
-=over 4
-
-=item state
-
-    $h->state                (undef)
-
-SQLSTATE is not implemented yet. It is planned for the (not so) near
-future.
-
-=item ping
-
-    $dbh->ping;
-
-Not yet implemented - on the ToDo list.
-
-=item OpenIngres new features
-
-The new features of OpenIngres are not (yet) supported in DBD::Ingres.
-
-This includes BLOBS, decimal datatype and spatial datatypes.
-
-Support will be added when the need arises - if you need it you add it ;-)
-
-=back
-
 =head2 Extensions/Changes
 
 =over 4
+
+=item get_dbevent
+
+This non-DBI method calls C<GET DBEVENT> and C<INQUIRE_INGRES> to
+fetch a pending database event. If called without argument a blocking
+C<GET DBEVENT WITH WAIT> is called. A numeric argument results in a
+call to C<GET DBEVENT WITH WAIT= :seconds>.
+
+In a second step
+C<INQUIRE_INGRES> is called to fetch the related information, wich is
+returned as a reference to a hash with keys C<name>, C<database>,
+C<text>, C<owner> and C<time>. The values are the C<dbevent>* values
+received from Ingres. If no event was fetched, C<undef> is returned.
+See F<t/event.t> for an example of usage.
+
+  $event_ref = $dbh->func(10, 'get_dbevent')     # wait 10 secs at most
+  $event_ref = $dbh->func('get_dbevent')         # blocks
+
+  for (keys %$event_ref) {
+    printf "%-20s = '%s'\n", $_, $event_ref->{$_};
+  }
 
 =item connect
 
@@ -206,12 +213,33 @@ and so on.
 
 =item do
 
-    $dbh-E<gt>do
+    $dbh->do
 
 This is implemented as a call to 'EXECUTE IMMEDIATE' with all the
 limitations that this implies.
 
 Placeholders and binding is not supported with C<$dbh-E<gt>do>.
+
+=item prepare and outerjoins
+
+Due to a bug in OpenIngres 1.2 there is no way of determining which
+fields in an 'outerjoin'select are nullable.
+
+Therefore all fields in outerjoin selects are deemed NULLABLE.
+
+DBD::Ingres tries to determine is a select statement is an outerjoin by
+(primitively) parsing the select statement. You can override this
+parsing by adding an attribute to the select-call:
+
+    $dbh-E<gt>prepare($statement, %attribs)
+
+$attribs{"ing_outerjoin"} should contain true for outerjoins and false
+otherwise.
+
+Eg:
+
+    $sth = $dbh->prepare("select...left join...", { ing_outerjoin => 1 });
+    $sth = $dbh->prepare("select...", { ing_outerjoin => 0 });
 
 =item ing_statement
 
@@ -259,7 +287,10 @@ All other supported types, ie. char, varchar, text, date etc.
 Returns an array containing the lengths of the fields in Ingres, eg. an
 int2 will return 2, a varchar(7) 7 and so on.
 
-Note that money and date will have length returned as 0.
+Note that money and date fields will have length returned as 0.
+
+C<$sth-E<gt>{SqlLen}> is the same as C<$sth-E<gt>{ing_lengths}>,
+but the use of it is depreceated.
 
 =item ing_types
 
@@ -267,6 +298,58 @@ Note that money and date will have length returned as 0.
 
 Returns an array containing the Ingres types of the fields. The types
 are given as documented in the Ingres SQL Reference Manual.
+
+All values are positive as the nullability of the field is returned in
+C<$sth-E<gt>{NULLABLE}>.
+
+=back
+
+=head2 Not implemented
+
+=over 4
+
+=item state
+
+    $h->state                (undef)
+
+SQLSTATE is not implemented yet. It is planned for the (not so) near
+future.
+
+=item ping
+
+    $dbh->ping;
+
+Not yet implemented - on the ToDo list.
+
+=item updateable cursors
+
+It should be possible to do something like this:
+
+    $sth = $dbh->prepare("select a,b,c from t", "ing_update" => [b,c]);
+    $sth->execute;
+    $row = $sth->fetchrow_arrayref;
+    $dbh->do("update t set b='1' where current of $sth->{CursorName}");
+
+The exact syntax is open for discussion (you implement => you decide!).
+
+=item disconnect_all
+
+Not implemented
+
+=item commit and rollback invalidates open cursors
+
+DBD::Ingres should warn when a commit or rollback is isssued on a $dbh
+with open cursors.
+
+Possibly a commit/rollback should also undef the $sth's
+
+=item OpenIngres new features
+
+The new features of OpenIngres are not (yet) supported in DBD::Ingres.
+
+This includes BLOBS, decimal datatype and spatial datatypes.
+
+Support will be added when the need arises - if you need it you add it ;-)
 
 =back
 
@@ -276,7 +359,7 @@ I wonder if I have forgotten something?
 
 =head1 SEE ALSO
 
-The DBI documentation (at the end of DBI.pm).
+The DBI documentation in L<DBI>.
 
 =head1 AUTHORS
 
@@ -285,4 +368,5 @@ developed the DBD::Oracle that is the closest we have to a generic DBD
 implementation.
 
 Henrik Tougaard, <ht@datani.dk> developed the DBD::Ingres extension.
+
 =cut

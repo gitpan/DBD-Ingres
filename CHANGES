@@ -1,3 +1,20 @@
+v0.05_96  1997.09.24
+    Added get_event func. Thanks to Ulrich Pfeifer.
+    Removed $dbh->rows. It was used by the ingperl emulation layer, and
+    could be avoided.
+    Updated the search strategy for DBIXS.h. Thanks to Jochen Wiedmann <wiedmann@Neckar-Alb.DE>
+    Switched to using the DBI-0.89 Driver.xs prototype.
+
+v0.05_95  1997.09.19
+    Tried to parse selects and discover if they are outerjoins.
+    Added $attribs{"ing_outerjoin"} to $dbh->prepare.
+    Documented it a bit more.
+
+v0.05_94  1997.09.18
+    Ulrich's patch for nullability added. Now I just need to check if there
+    is an outerjoin in the statement before deciding that all fields are
+    NULLABLE.
+
 v0.05_93  1997.09.15
     Ulrich's patch for locating DBD::Ingres somewhere else than DBI added to
     Makefile.PL.
@@ -5,9 +22,16 @@ v0.05_93  1997.09.15
 v0.05_92  1997.09.12 (early morning)
     Ulrich Pfeifer <Ulrich.Pfeifer@de.uu.net> has come up with a solution to my
     Makefile.PL problems with 'old' Ingres-versions. Thanks.
+
     Ifdef'fed around Ingres6.4 (and earlier) non-awareness of DBMS_PASSWORD
+
     $dbh->rows works again.
+
     This version builds and tests cleanly for me.
+
+    Note that dbdimp.psc now is processed by a chain of 3 links:
+    perl (Makefile.PL), Esql/C, C-compiler!
+    Cross your fingers and hope nothing breaks.
 
 v0.05_91  1997.09.11
     I just got the binding to work. I hope :)
@@ -20,7 +44,7 @@ v0.05_90  1997.09.10
     - HPUX must link statically
     - RCS Revision bumped to 2.100 so CPAN can find its way around
     - tried to adjust to the DBI-spec (as pr. DBI-0.90) with all Tim's new
-      ideas
+      ideas, $sth->{TYPE} now returns SQL_-values from DBI
     - expanded pod
     This is released as a "release early and often" version - respects to Eric
     S. Raymond - for the not faint at heart.

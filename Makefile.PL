@@ -1,5 +1,5 @@
 #!/usr/local/bin/perl -sw
-# $Id: Makefile.PL,v 2.102 1997/09/15 07:46:13 ht000 Exp $
+# $Id: Makefile.PL,v 2.104 1997/09/25 12:04:37 ht000 Exp $
 
 require 5.003_93;
 
@@ -16,6 +16,7 @@ require FileHandle unless defined(&FileHandle::new);
 # new static perl in the DBI directory by saying 'make perl'
 # and then using _that_ perl to make this one.
 use DBI 0.89;
+use DBI::DBD;
 
 my %opts = (
     NAME => 'DBD::Ingres',
@@ -75,19 +76,7 @@ for ($linkwith) {
 }
 
 # Try to figure out if this is an OpenIngres or not
-my $OpenIngres = (-f "$II_SYSTEM/ingres/lib/libcompat.1.so");
-# Esql/C  - The Stupid Thing (tm) can't handle #ifdef properly
-# We have to do it ourselves here:
-print "\nUn-ifdef'fing OpenIngres in dbdimp.sc\n";
-open(ORIG, "<dbdimp.psc") or die "Can't open dbdimp.psc, $!";
-open(NEW, ">dbdimp.sc") or die "Can't open new dbdimp.sc, $!";
-while (defined (my $lin = <ORIG>)) {
-    $lin =~ s!/\*OI\*!! if $OpenIngres;
-    $lin =~ s!/\*64\*!! unless $OpenIngres;
-    print NEW $lin;
-}
-close(ORIG);
-close(NEW);
+my $OpenIngres = int(-f "$II_SYSTEM/ingres/lib/libcompat.1.so");
 
 my $linkopt = "";
 
@@ -125,22 +114,35 @@ if ($Config{osname} eq 'hpux') {
 # log key platform information to help me help you quickly
 print "System: perl$] @Config{qw(myuname)}\n",
       "Compiler: @Config{qw(cc optimize ccflags)}\n",
-      "Linker:   ". find_bin('ld') ."\n",
       "Linking with $linkwith\n" if $Verbose;
 
 print "\n";
 
 $opts{LIBS} = [ "$libhome $linkwith" ];
 
-my $DBI_PATH= $INC{"DBI.pm"};
-$DBI_PATH =~ s{/DBI.pm$}{/$Config::Config{archname}};
-$opts{INC} = "-I$DBI_PATH/auto/DBI";
+# compute path to DBI include files
+my $INSTALLSITEARCH = $INC{'DBI.pm'};
+$INSTALLSITEARCH =~ s{/DBI.pm$}{};
+my $DBIXS_INSTALL_DIR;
+foreach my $guess ("$INSTALLSITEARCH/" . $Config::Config{archname},
+		$Config::Config{'installsitearch'}) {
+    if (-f "$guess/auto/DBI/DBIXS.h") {
+        $DBIXS_INSTALL_DIR = "$guess/auto/DBI";
+        $opts{'INC'} = "-I$DBIXS_INSTALL_DIR";
+        last;
+    }
+}
+if (!$DBIXS_INSTALL_DIR) {
+    die "Unable to find header file DBIXS.h; you seem to have an"
+	. " interesting Perl setup ...\n";
+}
+
 $opts{dynamic_lib} = { OTHERLDFLAGS => " $linkwith \$(COMPOBJS)" };
 $opts{OBJECT} = 'Ingres$(OBJ_EXT) dbdimp$(OBJ_EXT)';
 $opts{depend} = { "dbdimp\$(OBJ_EXT)" => "dbdimp.c Ingres.h",
 		  "Ingres\$(OBJ_EXT)" => "Ingres.h",
                 };
-$opts{clean} = { FILES => "dbdimp.c Ingres.h" };
+$opts{clean} = { FILES => "dbdimp.c dbdimp.sc Ingres.h Ingres.sc Ingres.xsi" };
 $opts{macro} = { ESQLC => "$II_SYSTEM/ingres/bin/esqlc", ESQLCOPT => "-o.h" };
 $opts{DEFINE} = '-DOPENINGRES' if $OpenIngres;
 WriteMakefile(%opts);
@@ -157,30 +159,40 @@ sub MY::post_initialize {
 }
 
 sub MY::postamble {
-'
+    # Note this is not quite in accordance with the DBD-writer specs.
+    # Mainly due to attempts to cater for 'wierd' DBI locations.
+    my $subst = $OpenIngres ?
+		    's!/\\*OI\\*!!' :    # Turn on OpenIngres or 
+		    's!/\\*64\\*!!';     # Ingres 6.4 parts of dbdimp.psc
+
+    q[
 dbdimp.c Ingres.h : dbdimp.sc Ingres.sh
 	$(ESQLC) $(ESQLCOPT) dbdimp.sc 
-';
+
+dbdimp.sc: dbdimp.psc
+	$(PERL) -p -e '].$subst.q[' dbdimp.psc > dbdimp.sc
+
+$(BASEEXT).xs: $(BASEEXT).xsi
+
+$(BASEEXT).c: $(BASEEXT).xsi
+
+DBI_DRIVER_XST = ].$DBIXS_INSTALL_DIR.q[/Driver.xst
+
+$(BASEEXT).xsi: $(DBI_DRIVER_XST)
+	perl -p -e "s/~DRIVER~/$(BASEEXT)/g" <$(DBI_DRIVER_XST) >$(BASEEXT).xsi
+];
 }
 
-
-sub find_bin{
-	my $bin = shift;
-	foreach(split(/:/, $ENV{PATH})){
-		return "$_/$bin" if -x "$_/$bin";
-	}
-	return "<$bin not found>";
-}
 
 {	# If perl Makefile.PL *-g* then switch on debugging
     package MY; # SUPER needs package context, $self is not sufficient
     sub const_cccmd {
-		my($self) = shift;
-		local($_) = $self->SUPER::const_cccmd(@_);
-		s/\s-O\d?\b/ -g/g if $::opt_g;
-		$_;
+	my($self) = shift;
+	local($_) = $self->SUPER::const_cccmd(@_);
+	s/\s-O\d?\b/ -g/g if $::opt_g;
+	$_;
     }
-    sub dynamic_lib { # VMS only - I hope
+    sub dynamic_lib { # This affects only VMS - I hope
 	my ($self) = shift;
 	local($_) = $self->SUPER::dynamic_lib(@_);
 	s!perlshr_attr.opt/Option!perlshr_attr.opt/Option,$linkopt!;

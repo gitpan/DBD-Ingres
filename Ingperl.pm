@@ -1,5 +1,5 @@
 #
-# $Id: Ingperl.pm,v 2.100 1997/09/10 08:00:41 ht000 Exp $
+# $Id: Ingperl.pm,v 2.101 1997/09/25 11:46:36 ht000 Exp $
 #
 # Ingperl emulation interface for DBD::Ingres
 #
@@ -17,7 +17,7 @@ use DBI 0.73;
 use Exporter;
 use Carp;
 
-$VERSION = substr(q$Revision: 2.100 $, 10);
+$VERSION = substr(q$Revision: 2.101 $, 10);
 
 @ISA = qw(Exporter);
 
@@ -31,7 +31,7 @@ $VERSION = substr(q$Revision: 2.100 $, 10);
 );
 
 use strict;
-use vars (qw[$sql_drh $sql_dbh $sql_sth $sql_debug]);
+use vars (qw[$sql_drh $sql_dbh $sql_sth $sql_debug $sql_rowcount]);
 
 $sql_debug    = 0 unless defined $sql_debug;
 
@@ -87,6 +87,7 @@ sub sql_exec {
     } else {
         croak "Ingperl: Not connected to database, at" unless $sql_dbh;
 
+	$sql_rowcount = 0;
 	if ($statement =~ /^\s*disconnect\b/i) {
             $sql_dbh->disconnect();
             undef $sql_dbh;
@@ -99,7 +100,7 @@ sub sql_exec {
         }
         else {
             # This is something else. Just execute the statement
-           $sql_dbh->do($statement);
+            $sql_rowcount = $sql_dbh->do($statement);
         }
     }
 }
@@ -119,6 +120,7 @@ sub sql_close {
 sub sql_fetch {
     croak "Ingperl: No active cursor, at" unless $sql_sth;
     my(@row) = $sql_sth->fetchrow();
+    $sql_rowcount = $sth->rows();
     unless (@row) {
 	&sql_close();
 	return wantarray ? () : undef;
@@ -146,6 +148,7 @@ sub sql {
             undef $sql_sth;
         }
         $sql_sth = $sql_dbh->prepare($statement) or return undef;
+        undef $sql_rowcount;
         $sql_sth->execute() or return undef;
     } else {
         return &sql_exec($statement);
@@ -173,7 +176,7 @@ sub sql_names       { $sql_sth ? @{$sql_sth->{'NAME'}}        : undef; }
 tie $Ingperl::sql_version,   'Ingperl::var', 'version';
 *sql_error = \$DBD::Ingres::errstr;
 *sql_sqlcode = \$DBD::Ingres::err;
-*sql_rowcount = \$DBI::rows;
+#######*sql_rowcount = \$DBI::rows;
 tie $Ingperl::sql_readonly,   'Ingperl::var', 'readonly';
 tie $Ingperl::sql_showerrors, 'Ingperl::var', 'showerror';
 

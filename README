@@ -1,16 +1,53 @@
 DBD::Ingres --  an Ingres interface for Perl 5 using DBI.
 
-   Copyright (c) 1996  Henrik Tougaard
+   Copyright (c) 1996,1997  Henrik Tougaard <ht@datani.dk>
 
    You may distribute under the terms of either the GNU General Public
    License or the Artistic License, as specified in the Perl README file.
 
+ANNOUNCEMENT:
+
+A new version of DBD::Ingres has just been uploaded to CPAN.
+It will appear in the mirrors during the next couple of days.
+
+New features:
+   o Support for placeholders and binding.
+     You can now do:
+       use DBI qw(:sql_types);
+       ....
+       $sth = $dbh->prepare("insert into tab(c1, c2) values(?, ?)");
+       $sth->bind_param(1, "col 1", {TYPE => SQL_CHAR});
+       $sth->bind_param(2, 2, {TYPE => SQL_INTEGER});
+       $sth->execute;
+       $sth->bind_param(2, 7, {TYPE => SQL_INTEGER});
+       $sth->execute;
+     (with appropriate errorchecks :) and have inserted two rows:
+        'col 1', 2
+        'col 1', 7
+     Binding can be used in most statements. See the SQL Reference
+     Manual for details.
+
+   o A function for retrieving database events has been added.
+     See Ingres.pm for details.
+     A general event-handling method has not been defined in the DBI
+     (yet). This function is intended as a stopgap and will (possibly)
+     be depreceated when (and if) a DBI-event-spec is available.
+     Use it at your own risk.
+
+   o The DBD::Ingres modules now use the DBI template files and are are
+     compliant with the DBI specs as of DBI version 0.90.
+     This implies some changes that may break 'old' DBD::Ingres scripts.
+     + $dbh->rows has been removed
+     + newstyle connect has autocommit on, oldstyle (and ingperl) still
+       has autocommit off.
+     + Some $sth attributes have been renamed:
+        SqlLen ->   ing_length
+        SqlType ->  ing_type
+   
 BEFORE BUILDING, TESTING AND INSTALLING this you will need to:
 
-    Build, test and install Perl 5.
+    Build, test and install Perl 5.004 (or newer)
     It is very important to test it and install it!
-
-*** NOTE: *** perl5 MUST BE INSTALLED TO VERSION 5.004 AT LEAST! ***
 
     Build, test and install the DBI module.
     It is very important to test it and install it!
@@ -30,11 +67,19 @@ BUILDING
 	make test
 	make install
 
-(For the test: set the environment variable DBI_DBNAME to the name
-of the database that you want to use. The test will create a table
-named 'testhththt', add some data to it and delete the table again.
-If you want a verbose print from the test: edit test.pl and set
-$verbose to 1)
+    HP-UX users (and others) will have to build perl with static
+    extensions:
+        make perl
+        make test
+        make inst_perl
+    See the MakeMaker docs for further: perldoc ExtUtils::MakeMaker
+
+The make test pass will ask for at databasename (if not given in one of
+the DBI environment variable (see DBI.pm for particulars). It will then
+create a table named 'testhththt' in this database, manipulate it and
+delete it again.
+It is important for the succes of the test that you have the neccesary
+Ingres permissions.
 
 The ingtest.pl script is a "quick" hack of the test for ingperl (the
 "old" perl4 interface).
@@ -54,43 +99,9 @@ KNOWN PROBLEMS:
             database-name username other-options
           otherwise the check for username wil fail.
 
-	o DBD::st:rows and DBD::db::rows do not change session. This will
-          cause errors if you have more than 1 connected session and
-          use the other session between an execute and the correspondings
-	  call of rows. Eg:
-		$dbh1->do("update ...");
-		$dbh2->do("delete...");
-		$rows = $dbh1->rows;   # <- this will return $dbh2->rows
-	  I'll fix it someday.....
-
 TO DO LIST:
 
         o Add support for OpenIngres 1.2: blobs  etc.
-
-
-RECENT CHANGES:
-v0.05_92  1997.09.12 (early morning)
-    Ulrich Pfeifer <Ulrich.Pfeifer@de.uu.net> has come up with a solution to my
-    Makefile.PL problems with 'old' Ingres-versions. Thanks.
-    Ifdef'fed around Ingres6.4 (and earlier) non-awareness of DBMS_PASSWORD
-    $dbh->rows works again.
-    This version builds and tests cleanly for me.
-
-v0.05_91  1997.09.11
-    I just got the binding to work. I hope :)
-    Now only $dbh->rows is mucked up.
-
-v0.05_90  1997.09.10
-    Major rehaul
-    - added bind params - NOTE It doesn't work yet
-    - added password support
-    - HPUX must link statically
-    - RCS Revision bumped to 2.100 so CPAN can find its way around
-    - tried to adjust to the DBI-spec (as pr. DBI-0.90) with all Tim's new
-      ideas
-    - expanded pod
-    This is released as a "release early and often" version - respects to Eric
-    S. Raymond - for the not faint at heart.
 
 
 IF YOU HAVE PROBLEMS:

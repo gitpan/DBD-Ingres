@@ -1,42 +1,41 @@
 use DBI qw(:sql_types);
-$verbose = 0;
+$verbose = 1 unless defined $verbose;
 $testtable = "testhththt";
 
 $dbname = $ENV{DBI_DBNAME} || $ENV{DBI_DSN} ||
            &ask_user("Please enter database-name: ");
 $dbname = "dbi:Ingres:$dbname" unless $dbname =~ /^dbi:Ingres/;
 
-print "1..26\n";
+my $num_test = 26;
+my $OpenIngres = (-f "$ENV{II_SYSTEM}/ingres/lib/libcompat.1.so");
+$num_test++ unless $OpenIngres;
+print "1..$num_test\n";
 
-print "Testing: DBI->connect('$dbname'): "
+print "Testing: DBI->connect('$dbname'):\n"
  	if $verbose;
 ( $dbh = DBI->connect($dbname) )
     and print("ok 1\n") 
     or die "not ok 1: $DBI::errstr\n";
 
-print "Testing: \$dbh->disconnect(): "
+print "Testing: \$dbh->disconnect():\n"
 	if $verbose;
 ( $dbh->disconnect )
     and print( "ok 2\n" )
     or print "not ok 2: $DBI::errstr\n";
 
-print "Re-testing: \$drh->connect('$dbname'): "
+print "Re-testing: \$drh->connect('$dbname'):\n"
 	if $verbose;
 ( $dbh = DBI->connect($dbname) )
     and print( "ok 3\n" )
     or print "not ok 3: $DBI::errstr\n";
 
-print "Testing: \$dbh->do( 'CREATE TABLE $testtable
-                       (
-                        id INTEGER4,
-                        name CHAR(64)
-                       )' ): "
+print "Testing: \$dbh->do( 'CREATE TABLE $testtable(id INTEGER4, name CHAR(64))'):\n"
 	if $verbose;
-( $dbh->do( "CREATE TABLE $testtable ( id INTEGER4, name CHAR(64) )" ) )
+( $dbh->do( "CREATE TABLE $testtable ( id INTEGER4, name CHAR(64) )\n" ) )
     and print( "ok 4\n" )
     or print "not ok 4: $DBI::errstr\n";
 
-print "Testing: \$dbh->do( 'DROP TABLE $testtable' ): "
+print "Testing: \$dbh->do( 'DROP TABLE $testtable' ):\n"
 	if $verbose;
 ( $dbh->do( "DROP TABLE $testtable" ) )
     and print( "ok 5\n" )
@@ -44,33 +43,33 @@ print "Testing: \$dbh->do( 'DROP TABLE $testtable' ): "
 
 print "Re-testing: \$dbh->do( 'CREATE TABLE $testtable
                        (
-                        id INTEGER4,
+                        id INTEGER4 NOT NULL,
                         name CHAR(64)
-                       )' ): "
+                       )' ):\n"
 	if $verbose;
-( $dbh->do( "CREATE TABLE $testtable ( id INTEGER4, name CHAR(64) )" ) )
+( $dbh->do( "CREATE TABLE $testtable ( id INTEGER4 NOT NULL, name CHAR(64) )" ) )
     and print( "ok 6\n" )
     or print "not ok 6: $DBI::errstr\n";
 
-print "Testing: \$dbh->do( 'INSERT INTO $testtable VALUES ( 1, 'Alligator Descartes' )' ): "
+print "Testing: \$dbh->do( 'INSERT INTO $testtable VALUES ( 1, 'Alligator Descartes' )'):\n"
 	if $verbose;
 ( $dbh->do( "INSERT INTO $testtable VALUES( 1, 'Alligator Descartes' )" ) )
     and print( "ok 7\n" )
     or print "not ok 7: $DBI::errstr\n";
 
-print "Testing: \$dbh->do( 'DELETE FROM $testtable WHERE id = 1' ): "
+print "Testing: \$dbh->do( 'DELETE FROM $testtable WHERE id = 1' ):\n"
 	if $verbose;
 ( $dbh->do( "DELETE FROM $testtable WHERE id = 1" ) )
     and print( "ok 8\n" )
     or print "not ok 8: $DBI::errstr\n";
 
-print "Testing: \$cursor = \$dbh->prepare( 'SELECT FROM $testtable WHERE id = 1' ): "
+print "Testing: \$cursor = \$dbh->prepare( 'SELECT FROM $testtable WHERE id = 1'):\n"
 	if $verbose;
 ( $cursor = $dbh->prepare( "SELECT * FROM $testtable WHERE id = 1" ) )
     and print( "ok 9\n" )
     or print( "not ok 9: $DBI::errstr\n" );
 
-print "Testing: \$cursor->execute: "
+print "Testing: \$cursor->execute:\n"
 	if $verbose;
 ( $cursor->execute )
     and print( "ok 10\n" )
@@ -78,20 +77,20 @@ print "Testing: \$cursor->execute: "
 
 print "*** Expect this test to fail with NO error message! (prints ok)\n"
 	if $verbose;
-print "Testing: \$cursor->fetchrow: "
+print "Testing: \$cursor->fetchrow:\n"
 	if $verbose;
 ( @row = $cursor->fetchrow ) 
     and print( "not ok 11: $row: '", join("', '", @row), "'\n" )
-    or print( "ok  11 errstr:'$DBI::errstr'\n" );
+    or print( "ok 11\n" );
 
-print "Testing: \$cursor->finish: "
+print "Testing: \$cursor->finish:\n"
 	if $verbose;
 ( $cursor->finish )
     and print( "ok 12\n" )
     or print( "not ok 12: $DBI::errstr\n" );
 undef $cursor;
 
-print "Testing placeholders and binding: "
+print "Testing placeholders and binding:\n"
 	if $verbose;
 ( $sth = $dbh->prepare( "INSERT INTO $testtable(id, name) VALUES(?, ?)" ) )
     and print( "ok 13\n" )
@@ -106,13 +105,13 @@ print "Testing placeholders and binding: "
     and print( "ok 16\n" )
     or print "not ok 16: $DBI::errstr\n";
 
-print "Re-testing bind:"
+print "Re-testing bind:\n"
 	if $verbose;
 ( $sth->execute( 2, 'Henrik Tougaard') )
     and print( "ok 17\n" )
     or print "not ok 17: $DBI::errstr\n";
 
-print "Re-testing: \$cursor = \$dbh->prepare( 'SELECT FROM $testtable WHERE id = 1' ): "
+print "Re-testing: \$cursor = \$dbh->prepare( 'SELECT FROM $testtable WHERE id = 1' ):\n"
 	if $verbose;
 ( $cursor = $dbh->prepare( "SELECT * FROM $testtable WHERE id = 1" ) )
     and print( "ok 18\n" )
@@ -127,26 +126,28 @@ print "  Names: '", join("', '", @{$cursor->{'NAME'}}), "'\n",
       "  SqlType: '", join("', '", @{$cursor->{'SqlType'}}),
       "'\n"
 	if $verbose;
+
+my $nullability = join ':', map int($_), @{$cursor->{'NULLABLE'}};
       
-print "Re-testing: \$cursor->execute: "
+print "Testing: \$cursor->execute:\n"
 	if $verbose;
 ( $cursor->execute )
     and print( "ok 19\n" )
     or print "not ok 19: $DBI::errstr\n";
 
-print "Re-testing: \$cursor->fetchrow: "
+print "Re-testing: \$cursor->fetchrow:\n"
 	if $verbose;
 ( @row = $cursor->fetchrow ) 
     and print( "ok 20\n" )
     or print "not ok 20: $DBI::errstr\n";
 
-print "Re-testing: \$cursor->finish: "
+print "Re-testing: \$cursor->finish:\n"
 	if $verbose;
 ( $cursor->finish )
     and print( "ok 21\n" )
     or print "not ok 21: $DBI::errstr\n";
 
-print "Testing: \$dbh->do( 'UPDATE $testtable SET id = 3 WHERE name = 'Alligator Descartes'' ): "
+print "Testing: \$dbh->do( 'UPDATE $testtable SET id = 3 WHERE name = 'Alligator Descartes'' ):\n"
 	if $verbose;
 ( $dbh->do( "UPDATE $testtable SET id = 3 WHERE name = 'Alligator Descartes'" ) )
     and print( "ok 22\n" )
@@ -157,14 +158,14 @@ print "Testing update of all rows\n"
 ( $numrows = $dbh->do( "UPDATE $testtable SET id = id+1" ) )
     and print( "ok 23\n" )
     or print "not ok 23: $DBI::errstr\n";
-# row-count!!!!
-print "Affected rows = $DBI::rows, do returned: $numrows, should be 2\n"
-	if $verbose;
-print "not " if ($DBI::rows != 2 || $numrows != 2);
-print "ok 24\n";
+
+print "Testing number of rows\n" if $verbose;
+( $numrows == 2 )
+    and print("ok 24\n" )
+    or print "not ok 23: Number of rows = $numrows, should be 2\n";
 
 
-print "Re-testing: \$dbh->do( 'DROP TABLE $testtable' ): "
+print "Re-testing: \$dbh->do( 'DROP TABLE $testtable' ):\n"
 	if $verbose;
 ( $dbh->do( "DROP TABLE $testtable" ) )
     and print( "ok 25\n" )
@@ -175,8 +176,16 @@ print "Rolling back\n"
 ( $dbh->rollback )
    and print "ok 26\n"
    or print "not ok 26: $DBI::errstr\n";
+
+print +(($nullability eq '0:1')?'':'not '), "ok 27\n"
+  unless $OpenIngres;
+
 print "*** Testing of DBD::Ingres complete! You appear to be normal! ***\n"
 	if $verbose;
+
+print +(($nullability eq '0:1')?'':'not '), "ok 27\n"
+  unless $OpenIngres;
+
 
 sub ask_user {
     # gets information from the user

@@ -1,5 +1,5 @@
 /*
- * $Id: dbdimp.psc,v 2.103 1997/09/15 07:46:13 ht000 Exp $
+ * $Id: dbdimp.psc,v 2.106 1997/09/25 11:46:36 ht000 Exp $
  *
  * Copyright (c) 1994,1995  Tim Bunce
  *           (c) 1996,1997  Henrik Tougaard
@@ -59,7 +59,7 @@ static void dump_sqlda(sqlda)
     }
 }
 
-int
+static int
 sql_check(h)
     SV * h;
 {
@@ -85,7 +85,7 @@ sql_check(h)
     } else return 1;
 }
 
-void
+static void
 error(h, error_num, text, state)
     SV * h;
     int error_num;
@@ -98,7 +98,7 @@ error(h, error_num, text, state)
     if (state != 0) sv_setpv(DBIc_STATE(imp_xxh), state);
 }
 
-void
+static void
 set_session(dbh)
     SV * dbh;
 {
@@ -123,10 +123,30 @@ dbd_init(dbistate)
     nxt_session = 1;
 }
 
+int
+dbd_discon_all(drh, imp_drh)
+    SV *drh;
+    imp_drh_t *imp_drh;
+{
+    /* The disconnect_all concept is flawed and needs more work */
+    if (!dirty && !SvTRUE(perl_get_sv("DBI::PERL_ENDING",0))) {
+	sv_setiv(DBIc_ERR(imp_drh), (IV)1);
+	sv_setpv(DBIc_ERRSTR(imp_drh),
+		(char*)"disconnect_all not implemented");
+	DBIh_EVENT2(drh, ERROR_event,
+		DBIc_ERR(imp_drh), DBIc_ERRSTR(imp_drh));
+	return FALSE;
+    }
+    if (perl_destruct_level)
+	perl_destruct_level = 0;
+    return FALSE;
+}
+
 static U32* statement_numbers;    /* bitmask of reserved statement nos */
 static int statement_max;         /* max bit number allocated (8 pr char) */
 
-void release_statement(num)
+static void
+release_statement(num)
     int num;
 {
     if (num < 0 || num >= statement_max*8) return;
@@ -194,7 +214,7 @@ generate_statement_name(st_num)
 }
 
 
-void
+static void
 fbh_dump(fbh, i)
     imp_fbh_t *fbh;
     int i;
@@ -211,15 +231,15 @@ fbh_dump(fbh, i)
 /* ================================================================== */
 
 int
-dbd_db_login(dbh, dbname, user, pass)
+dbd_db_login(dbh, imp_dbh, dbname, user, pass)
     SV *dbh;
+    imp_dbh_t *imp_dbh;
     EXEC SQL BEGIN DECLARE SECTION;
     char *dbname;
     char *user;
     char *pass;
     EXEC SQL END DECLARE SECTION;
 {
-    D_imp_dbh(dbh);
     EXEC SQL BEGIN DECLARE SECTION;
     int session;
     char * opt;
@@ -270,16 +290,13 @@ dbd_db_login(dbh, dbname, user, pass)
 }
 
 int
-dbd_db_do(dbh, statement, attribs, params)
+dbd_db_do(dbh, statement)
     SV * dbh;
     EXEC SQL BEGIN DECLARE SECTION;
     char * statement;
     EXEC SQL END DECLARE SECTION;
-    char * attribs;
-    SV *params;
 {
     D_imp_dbh(dbh);
-
     if (dbis->debug >= 2)
         fprintf(DBILOGFP,"DBD::Ingres::dbd_db_do(\"%s\")\n", statement);
     set_session(dbh);
@@ -290,31 +307,19 @@ dbd_db_do(dbh, statement, attribs, params)
 }
 
 int
-dbd_db_rows(dbh, imp_dbh)
-    SV *dbh;
-    imp_dbh_t *imp_dbh;
-{
-    EXEC SQL BEGIN DECLARE SECTION;
-    int rowcount;
-    EXEC SQL END DECLARE SECTION;
-    if (dbis->debug >= 2)
-	fprintf(DBILOGFP, "dbd_rows\n");
-    set_session(dbh);
-    EXEC SQL INQUIRE_INGRES(:rowcount = ROWCOUNT);
-    if (dbis->debug >= 2)
-	fprintf(DBILOGFP, "rowcount = %d\n", rowcount);
-    if (!sql_check(dbh)) return -1;
-    else return rowcount;
-}
-
-int
-dbd_db_commit(dbh)
+dbd_db_commit(dbh, imp_dbh)
     SV* dbh;
+    imp_dbh_t* imp_dbh;
 {
-    D_imp_dbh(dbh);
-
     if (dbis->debug >= 2)
         fprintf(DBILOGFP,"DBD::Ingres::dbd_db_commit\n");
+
+    /* Check for commit() being called whilst refs to cursors	*/
+    /* still exists. This needs some more thought.		*/
+    if (DBIc_ACTIVE_KIDS(imp_dbh) && DBIc_WARN(imp_dbh) && !dirty) {
+	warn("commit(%s) invalidates %d active cursor(s)",
+	    SvPV(dbh,na), (int)DBIc_ACTIVE_KIDS(imp_dbh));
+    }
 
     set_session(dbh);
     EXEC SQL COMMIT;
@@ -322,27 +327,89 @@ dbd_db_commit(dbh)
 }
 
 int
-dbd_db_rollback(dbh)
+dbd_db_rollback(dbh, imp_dbh)
     SV* dbh;
+    imp_dbh_t* imp_dbh;
 { 
-    D_imp_dbh(dbh);
-
     if (dbis->debug >= 2)
         fprintf(DBILOGFP,"DBD::Ingres::dbd_db_rollback\n");
+
+    /* Check for commit() being called whilst refs to cursors	*/
+    /* still exists. This needs some more thought.		*/
+    if (DBIc_ACTIVE_KIDS(imp_dbh) && DBIc_WARN(imp_dbh) && !dirty) {
+	warn("commit(%s) invalidates %d active cursor(s)",
+	    SvPV(dbh,na), (int)DBIc_ACTIVE_KIDS(imp_dbh));
+    }
 
     set_session(dbh);
     EXEC SQL ROLLBACK;
     return sql_check(dbh);
 }
 
-int
-dbd_db_disconnect(dbh)
+SV*
+dbd_db_get_dbevent(dbh, imp_dbh, wait)
     SV* dbh;
+    imp_dbh_t* imp_dbh;
+    SV* wait;
+{
+    if (dbis->debug >= 2)
+        fprintf(DBILOGFP,"DBD::Ingres::dbd_get_dbevent\n");
+
+    set_session(dbh);
+    if (!wait || !SvOK(wait) || !SvIOK(wait)) {
+      EXEC SQL GET DBEVENT WITH WAIT;
+    } else {
+      EXEC SQL BEGIN DECLARE SECTION;
+      int seconds;
+      EXEC SQL END DECLARE SECTION;
+
+      seconds = (int)SvIV(wait);
+      EXEC SQL GET DBEVENT WITH WAIT = :seconds;
+    }
+    if (!sql_check(dbh)) return (&sv_undef);
+{
+    HV *result;
+    EXEC SQL BEGIN DECLARE SECTION;
+    char event_name    [80];
+    char event_database[80];
+    char event_owner   [80];
+    char event_text    [256];
+    char event_date    [26];
+    EXEC SQL END DECLARE SECTION;
+
+    if (dbis->debug >= 2)
+	fprintf(DBILOGFP, "dbd_db_inquire_event\n");
+    set_session(dbh);
+    EXEC SQL INQUIRE_INGRES
+      (:event_name     = DBEVENTNAME,
+       :event_database = DBEVENTDATABASE,
+       :event_text     = DBEVENTTEXT,
+       :event_owner    = DBEVENTOWNER,
+       :event_date     = DBEVENTTIME
+       );
+    if (dbis->debug >= 2)
+	fprintf(DBILOGFP, "eventname = %s\n", event_name);
+    if (!sql_check(dbh)) return (&sv_undef);
+    if (!*event_name)    return (&sv_undef);
+    result = newHV();
+
+    hv_store(result, "name",     sizeof("name")    -1, newSVpv(event_name,    0),0);
+    hv_store(result, "database", sizeof("database")-1, newSVpv(event_database,0),0);
+    hv_store(result, "text",     sizeof("text")    -1, newSVpv(event_text,    0),0);
+    hv_store(result, "owner",    sizeof("owner")   -1, newSVpv(event_owner,   0),0);
+    hv_store(result, "time",     sizeof("time")    -1, newSVpv(event_date,    0),0);
+    return(sv_2mortal(newRV_noinc((SV*)result)));
+}
+}
+
+int
+dbd_db_disconnect(dbh, imp_dbh)
+    SV* dbh;
+    imp_dbh_t* imp_dbh;
 {
     EXEC SQL BEGIN DECLARE SECTION;
     int transaction_active;
     EXEC SQL END DECLARE SECTION;
-    D_imp_dbh(dbh);
     DBIc_ACTIVE_off(imp_dbh);
 
     if (dbis->debug >= 2)
@@ -369,27 +436,26 @@ dbd_db_disconnect(dbh)
 }
 
 void
-dbd_db_destroy(dbh)
+dbd_db_destroy(dbh, imp_dbh)
     SV* dbh;
+    imp_dbh_t* imp_dbh;
 {
-    D_imp_dbh(dbh);
-
     if (dbis->debug >= 2)
         fprintf(DBILOGFP,"DBD::Ingres::dbd_db_destroy\n");
 
     if (DBIc_ACTIVE(imp_dbh))
-        dbd_db_disconnect(dbh);
+        dbd_db_disconnect(dbh, imp_dbh);
     /* XXX free contents of imp_dbh */
     DBIc_IMPSET_off(imp_dbh);
 }
 
 int
-dbd_db_STORE_attrib(dbh, keysv, valuesv)
+dbd_db_STORE_attrib(dbh, imp_dbh, keysv, valuesv)
     SV *dbh;
+    imp_dbh_t* imp_dbh;
     SV *keysv;
     SV *valuesv;
 {
-    D_imp_dbh(dbh);
     STRLEN kl;
     char *key = SvPV(keysv,kl);
     SV *cachesv = NULL;
@@ -417,11 +483,11 @@ dbd_db_STORE_attrib(dbh, keysv, valuesv)
 }
 
 SV *
-dbd_db_FETCH_attrib(dbh, keysv)
+dbd_db_FETCH_attrib(dbh, imp_dbh, keysv)
     SV* dbh;
+    imp_dbh_t* imp_dbh;
     SV* keysv;
 {
-    D_imp_dbh(dbh);
     STRLEN kl;
     char *key = SvPV(keysv,kl);
     int i;
@@ -452,8 +518,9 @@ dbd_db_FETCH_attrib(dbh, keysv)
 /* ================================================================== */
 
 int
-dbd_st_prepare(sth, statement, attribs)
+dbd_st_prepare(sth, imp_sth, statement, attribs)
     SV* sth;
+    imp_sth_t* imp_sth;
     EXEC SQL BEGIN DECLARE SECTION;
     char *statement;
     EXEC SQL END DECLARE SECTION;
@@ -463,12 +530,16 @@ dbd_st_prepare(sth, statement, attribs)
     EXEC SQL BEGIN DECLARE SECTION;
     char* name;
     EXEC SQL END DECLARE SECTION;
-    D_imp_sth(sth);
     D_imp_dbh_from_sth;
 
     if (dbis->debug >= 2)
         fprintf(DBILOGFP,"DBD::Ingres::dbd_st_prepare('%s')\n", statement);
 
+    if (attribs) {
+	SV **svp;
+	DBD_ATTRIB_GET_BOOL(attribs, "ing_outerjoin",13,
+	    svp, imp_sth->outerjoin);
+    }
     imp_sth->done_desc = 0;
     sqlda = &imp_sth->sqlda;
     strcpy(sqlda->sqldaid, "SQLDA   ");
@@ -528,8 +599,8 @@ dbd_st_prepare(sth, statement, attribs)
 }
 
 int
-dbd_describe(h, imp_sth)
-     SV *h;
+dbd_describe(sth, imp_sth)
+     SV *sth;
      imp_sth_t *imp_sth;
 {
     IISQLDA* sqlda = &imp_sth->sqlda;
@@ -553,10 +624,15 @@ dbd_describe(h, imp_sth)
     {
         imp_fbh_t *fbh = &imp_sth->fbh[i];
         IISQLVAR *var = fbh->var = &sqlda->sqlvar[i];
-        /* fbh->nullable = var->sqltype < 0;
+#ifndef OpenIngres
+        fbh->nullable = var->sqltype < 0;
+#else
+        /*
         ** Temporary hack for OpenIngres 1.2
         ** Can't determine nullability for outerjoins */
-        fbh->nullable = 1;
+	if (imp_sth->outer_join) fbh->nullable = 1;
+	else fbh->nullable = var->sqltype < 0;
+#endif
         fbh->origtype = var->sqltype = abs(var->sqltype);
         fbh->origlen = var->sqllen;
         var->sqlname.sqlnamec[var->sqlname.sqlnamel] = 0;
@@ -714,10 +790,10 @@ dbd_bind_ph (sth, imp_sth, param, value, sql_type, attribs, is_inout, maxlen)
 }
 
 int
-dbd_st_execute(sth)	/* <=0 is error, >0 is ok */
+dbd_st_execute(sth, imp_sth)	/* <=0 is error, >0 is ok */
     SV *sth;
+    imp_sth_t *imp_sth;
 {
-    D_imp_sth(sth);
     EXEC SQL BEGIN DECLARE SECTION;
     char* name = imp_sth->name;
     EXEC SQL END DECLARE SECTION;
@@ -766,11 +842,11 @@ dbd_st_execute(sth)	/* <=0 is error, >0 is ok */
 }
 
 AV *
-dbd_st_fetch(sth)
+dbd_st_fetch(sth, imp_sth)
     SV *     sth;
+    imp_sth_t *imp_sth;
 {
     IISQLDA* sqlda;
-    D_imp_sth(sth);
     int num_fields;
     int i;
     AV *av;
@@ -867,10 +943,10 @@ dbd_st_rows(sth, imp_sth)
 }
 
 int
-dbd_st_finish(sth)
+dbd_st_finish(sth, imp_sth)
     SV *sth;
+    imp_sth_t *imp_sth;
 {
-    D_imp_sth(sth);
     EXEC SQL BEGIN DECLARE SECTION;
     char* name = imp_sth->name;
     EXEC SQL END DECLARE SECTION;
@@ -892,12 +968,11 @@ dbd_st_finish(sth)
 }
 
 void
-dbd_st_destroy(sth)
+dbd_st_destroy(sth, imp_sth)
     SV *sth;
+    imp_sth_t *imp_sth;
 {
     int i;
-    D_imp_sth(sth);
-    D_imp_dbh_from_sth;
 
     if (dbis->debug >= 2)
         fprintf(DBILOGFP,"DBD::Ingres::dbd_st_destroy(%s)\n", imp_sth->name);
@@ -909,12 +984,26 @@ dbd_st_destroy(sth)
 }
 
 int
-dbd_st_STORE_attrib(sth, keysv, valuesv)
+dbd_st_blob_read(sth, imp_sth,
+                 field, offset, len, destrv, destoffset)
     SV *sth;
+    imp_sth_t *imp_sth;
+    int field;
+    long offset;
+    long len;
+    SV *destrv;
+    long destoffset;
+{
+   die("Ingres: blob_read not (yet) implemented - sorry!");
+}
+
+int
+dbd_st_STORE_attrib(sth, imp_sth, keysv, valuesv)
+    SV *sth;
+    imp_sth_t *imp_sth;
     SV *keysv;
     SV *valuesv;
 {
-    D_imp_sth(sth);
     STRLEN kl;
     char *key = SvPV(keysv,kl);
     SV *cachesv = NULL;
@@ -932,11 +1021,11 @@ dbd_st_STORE_attrib(sth, keysv, valuesv)
 
 
 SV *
-dbd_st_FETCH_attrib(sth, keysv)
+dbd_st_FETCH_attrib(sth, imp_sth, keysv)
     SV *sth;
+    imp_sth_t *imp_sth;
     SV *keysv;
 {
-    D_imp_sth(sth);
     STRLEN kl;
     char *key = SvPV(keysv,kl);
     int i;
