@@ -1,4 +1,4 @@
-# $Id: //depot/tilpasninger/dbd-ingres/Ingperl.pm#2 $ $DateTime: 2001/03/02 14:15:40 $ $Revision: #2 $
+# $Id: //depot/tilpasninger/dbd-ingres/Ingperl.pm#3 $ $DateTime: 2002/05/13 18:52:39 $ $Revision: #3 $
 #
 # Ingperl emulation interface for DBD::Ingres
 #
@@ -16,7 +16,7 @@ use DBI 0.73;
 use Exporter;
 use Carp;
 
-$VERSION = 3.0+substr(q$Revision: #2 $, 11)/100;
+$VERSION = 3.0+substr(q$Revision: #3 $, 11)/100;
 
 @ISA = qw(Exporter);
 

@@ -168,6 +168,8 @@ ok(0, $dbh->rollback, "Rolling back", 1);
 ok(0, !$dbh->{AutoCommit}, "AutoCommit switched off upon connect time", 1);
 $dbh->{AutoCommit}=1;
 ok(0, $dbh->{AutoCommit}, "AutoCommit switched on", 1);
+$dbh->{AutoCommit}=1;
+ok(0, $dbh->{AutoCommit}, "AutoCommit switched on again", 1);
 
 ok(0, $dbh->disconnect, "Disconnecting", 1);
 
@@ -182,5 +184,5 @@ $dbh and $dbh->disconnect;
 #   test of outerjoin and nullability
 #   what else?
 
-BEGIN { $num_test = 49; }
+BEGIN { $num_test = 50; }
 

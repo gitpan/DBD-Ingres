@@ -67,7 +67,7 @@ sub connect_db($$) {
 
 my $dbname = get_dbname;
 my $openingres = openingres;
-if ($openingres) {
+if (!$openingres) {
     print "1..0 # Only on OpenIngres or newer\n";
     exit(0);
 }

@@ -1,5 +1,5 @@
 /*                               -*- Mode: C -*- 
- * $Id: //depot/tilpasninger/dbd-ingres/dbdimp.psc#6 $
+ * $Id: //depot/tilpasninger/dbd-ingres/dbdimp.psc#7 $
  *
  * Copyright (c) 1994,1995  Tim Bunce
  *           (c) 1996,1997  Henrik Tougaard
@@ -511,22 +511,34 @@ dbd_db_STORE_attrib(dbh, imp_dbh, keysv, valuesv)
 
     set_session(dbh);
     if (kl==10 && strEQ(key, "AutoCommit")){
-        if (dbis->debug >= 3)
-            PerlIO_printf(DBILOGFP,"DBD::Ingres::dbd_db_STORE(AUTOCOMMIT=");
-        if (on) {
-            EXEC SQL COMMIT;
-            EXEC SQL SET AUTOCOMMIT ON;
-            if (dbis->debug >= 3)
-                PerlIO_printf(DBILOGFP,"ON), sqlcode=%d\n", sqlca.sqlcode);
-        } else {
-            EXEC SQL COMMIT;
-            EXEC SQL SET AUTOCOMMIT OFF;
-            if (dbis->debug >= 3)
-                PerlIO_printf(DBILOGFP,"OFF), sqlcode=%d\n", sqlca.sqlcode);
-        }
-        DBIc_set(imp_dbh, DBIcf_AutoCommit, on);
+      EXEC SQL BEGIN DECLARE SECTION;
+      int transaction_state;
+      EXEC SQL END DECLARE SECTION;
+      EXEC SQL SELECT INT4(DBMSINFO('TRANSACTION_STATE'))
+	INTO :transaction_state;
+      if (dbis->debug >= 3)
+	PerlIO_printf(DBILOGFP,
+		      "DBD::Ingres::dbd_db_FETCH(TRANSACTION=%d)sqlca=%d\n",
+		      transaction_state, sqlca.sqlcode);
+      if (transaction_state == 0) {
+	EXEC SQL COMMIT;
+      }
+      if (dbis->debug >= 3)
+	PerlIO_printf(DBILOGFP,"DBD::Ingres::dbd_db_STORE(AUTOCOMMIT=");
+      if (on) {
+	EXEC SQL SET AUTOCOMMIT ON;
+	if (dbis->debug >= 3)
+	  PerlIO_printf(DBILOGFP,"ON), sqlcode=%d\n", sqlca.sqlcode);
+	sql_check(dbh);
+      } else {
+	EXEC SQL SET AUTOCOMMIT OFF;
+	if (dbis->debug >= 3)
+	  PerlIO_printf(DBILOGFP,"OFF), sqlcode=%d\n", sqlca.sqlcode);
+	sql_check(dbh);
+      }
+      DBIc_set(imp_dbh, DBIcf_AutoCommit, on);
     } else {
-        return FALSE;
+      return FALSE;
     }
     if (cachesv) /* cache value for later DBI 'quick' fetch? */
         hv_store((HV*)SvRV(dbh), key, kl, cachesv, 0);
@@ -548,20 +560,24 @@ dbd_db_FETCH_attrib(dbh, imp_dbh, keysv)
 
     set_session(dbh);
     if (kl==10 && strEQ(key, "AutoCommit")){
-        EXEC SQL BEGIN DECLARE SECTION;
-        int autocommit_state;
-        EXEC SQL END DECLARE SECTION;
-        
-        EXEC SQL SELECT INT4(DBMSINFO('AUTOCOMMIT_STATE'))
-            INTO :autocommit_state;
-        if (dbis->debug >= 3)
-            PerlIO_printf(DBILOGFP,
-                "DBD::Ingres::dbd_db_FETCH(AUTOCOMMIT=%d)sqlca=%d\n",
-                autocommit_state, sqlca.sqlcode);
-        DBIc_set(imp_dbh, DBIcf_AutoCommit, autocommit_state);
-        retsv = newSVsv(boolSV(autocommit_state));
-        cacheit = FALSE;   /* Don't cache AutoCommit state - some
-                           /* fool^H^H^H^Huser may change it via SQL */
+      EXEC SQL BEGIN DECLARE SECTION;
+      int autocommit_state, transaction_state;
+      EXEC SQL END DECLARE SECTION;
+      
+      EXEC SQL SELECT INT4(DBMSINFO('AUTOCOMMIT_STATE')),
+	INT4(DBMSINFO('TRANSACTION_STATE'))
+	INTO :autocommit_state, :transaction_state;
+      if (dbis->debug >= 3)
+	PerlIO_printf(DBILOGFP,
+		      "DBD::Ingres::dbd_db_FETCH(AUTOCOMMIT=%d, TRANSACTION=%d)sqlca=%d\n",
+		      autocommit_state, transaction_state, sqlca.sqlcode);
+      DBIc_set(imp_dbh, DBIcf_AutoCommit, autocommit_state);
+      retsv = newSVsv(boolSV(autocommit_state));
+      cacheit = FALSE;   /* Don't cache AutoCommit state - some
+			    /* fool^H^H^H^Huser may change it via SQL */
+      if (transaction_state == 0) {
+	EXEC SQL COMMIT;
+      }
     }
 
     if (!retsv)

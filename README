@@ -59,6 +59,10 @@ know so that I can try to make it automatic in a later release.
 
 New features (See the CHANGES file for a complete list):
 
+v0.33       2002.05.13
+ -Bug in AutoCommit handling fixed. Previously Setting AutoCommit caused
+  a $dbh->Commit to be executed causing all kinds of grief.
+
 v0.32       2002.03.06
  -Changes for perl5.7.3: all fprintf calls replaces by PerlIO_printf.
  -Bug in $sth->execute fixed. Sometimes errors were not detected.
