@@ -1,4 +1,4 @@
-#   $Id: Ingres.pm,v 1.9 1997/01/17 07:00:26 ht Exp $
+#   $Id: Ingres.pm,v 1.11 1997/03/20 08:49:19 ht Exp $
 #
 #   Copyright (c) 1994,1995 Tim Bunce
 #             (c) 1996 Henrik Tougaard
@@ -15,8 +15,8 @@ require 5.003;
     use DynaLoader ();
     @ISA = qw(DynaLoader);
 
-    $VERSION = '0.04';
-    my $Revision = substr(q$Revision: 1.9 $, 10);
+    $VERSION = '0.05';
+    my $Revision = substr(q$Revision: 1.11 $, 10);
 
     require_version DBI 0.73;
 

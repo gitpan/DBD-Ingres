@@ -8,6 +8,9 @@ I have built this on:
 It has been built and tested on
   SunOS 4.1.3 (OpenIngres 1.1) and
   Solaris 2.5 (OpenIngres 1.2) by  Kraemer <szrzs069@sysadm.rz.uni-kiel.de>
+  HP-UX 9 (Ingres 6.4) by Gil Hirsch <gilh@cpm.telrad.co.il>
+     (HP-UX 9 needs static linking, the Makefile.PL has been modified to
+     handle this).
 
 I will with pleasure accept patches and/or recommendations for improvements.
 My workload prevents me from giving this too much time - so have patience....

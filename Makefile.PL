@@ -1,5 +1,5 @@
 #!/usr/local/bin/perl -sw
-# $Id: Makefile.PL,v 1.7 1997/01/09 08:09:19 ht Exp $
+# $Id: Makefile.PL,v 1.9 1997/03/20 08:49:19 ht Exp $
 
 require 5.003;
 
@@ -57,7 +57,17 @@ my $II = $ENV{II_SYSTEM};
 print "Using Ingres in $II\n";
 
 my $libhome = "";
-my $linkwith = "-L$II/ingres/lib -lingres";
+my $linkwith = "-L$II/ingres/lib -lingres";  # good (?) guess for 6.4
+if (-f "$II/ingres/files/abflnk.opt") {
+    # the option file should give us all the libraries we need
+    open(ABFLNK, "$II/ingres/files/abflnk.opt")
+        or die "Can't read the option file ".
+               "'$II/ingres/files/abflnk.opt'\n";
+    $linkwith = join(" ", <ABFLNK>);
+    close ABFLNK;
+    $linkwith =~ s/\n//g;
+    $linkwith =~ s/\$II_SYSTEM/$II/g;
+}
 my $linkopt = "";
 
 # --- Handle special cases ---
@@ -69,11 +79,6 @@ $opts{DEFINE} .= '-Xa' if $Config{cc} eq 'clcc';	# CenterLine CC
 
 warn "WARNING: Your GNU C compiler is very old. Please upgrade.\n"
     if ($Config{gccversion} and $Config{gccversion} =~ m/^(1|2\.[1-5])/);
-
-# Digital Unix needs the DecNet stub library (or the real thing if it there)
-if ($Config{osname} eq 'dec_osf') {
-    $linkwith .= " -ldnet_stub"; # include DecNet stub library
-}
 
 # OpenVMS has specialities:
 if ($Config{osname} eq 'VMS') {
@@ -89,6 +94,13 @@ if ($Config{osname} eq 'solaris') {
     $linkwith .= " -lelf";
 }
 
+# HP-UX 9 cannot link a non-PIC object file into a shared library.
+if ($Config{osname} eq 'hpux' and $Config{osvers} < 10) {
+    print "Warning: forced to build static not dynamic on $Config{osname} $Config{osvers}\n";
+    print "         See README for more information.\n";
+    $opts{LINKTYPE} = 'static';
+}
+
 # log key platform information to help me help you quickly
 print "System: perl$] @Config{qw(myuname)}\n",
       "Compiler: @Config{qw(cc optimize ccflags)}\n",
@@ -98,7 +110,7 @@ print "System: perl$] @Config{qw(myuname)}\n",
 print "\n";
 
 $opts{LIBS} = [ "$libhome $linkwith" ];
-$opts{INC}  = "-I\$(INSTALLSITEARCH)/DBI";
+$opts{INC} = "-I\$(INSTALLSITEARCH)/auto/DBI -I\$(INSTALLSITEARCH)/DBI";
 $opts{dynamic_lib} = { OTHERLDFLAGS => " $linkwith \$(COMPOBJS)" };
 $opts{OBJECT} = 'Ingres$(OBJ_EXT) dbdimp$(OBJ_EXT)';
 $opts{depend} = { "dbdimp\$(OBJ_EXT)" => "dbdimp.c Ingres.h",
