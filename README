@@ -14,7 +14,19 @@ As of now (1999.05.25) the advice is to use Perl5.005_02.
    You may distribute under the terms of either the GNU General Public
    License or the Artistic License, as specified in the Perl README file.
 
-New features:
+New features (See the CHANGES file for a complete list):
+v0.24       1999.10.29
+  The "OF column..." part of the "FOR UPDATE" clause is optional.
+  Clarified the pod (or tried to at least).
+
+  This changes the behaviour of the updateable cursor patch added by
+  Dirk Koopman <djk@tobit.co.uk> in version 0.19_1.  I hope nothing is
+  seriously broken by this change.
+  It does seem the best to let cursors be readonly by default and
+  explicitly change that if you want to update. The update of a cursor
+  without a "FOR UPDATE OF..." clause is not documented and could
+  go away at any time.
+
 v0.23       1999.10.28
   Now tries to discover whether a select-cursor should be opened READONLY 
   or not.
@@ -34,77 +46,6 @@ v0.22       1999.10.26
 v0.21       1999.09.16
   It seems that a statement name can only be 23 characters long in Ingres 6.4
   Fixed, thanks to Bruce W. Hoylman <bhoylma@advtech.uswest.com>.
-
-v0.20       1999.09.01
-  This has been running without problems on several machines here for some
-  months now. Time to release it and see what (if anything) breaks.
-  Still to be done:
-  - linking on VMS (waiting for DBI to link w.o. problems on VMS).
-  - compiling without tweeking on NT (ran out of tuits).
-  - tracking the latest chenges in the DBI spec (meta data and cached          
-    statements to name the most obvious).
-
-V0.19_3     1999.05.25
-  - Cleanup of the code. Removal of some/all (?!!) of the core dumps.
-    No longer 'unaligned access'.
-  - Redo the check for re-preparation (still croak if a commit/rollback
-    has invalidated the statement).
-
-    Possibly fit for human comsumption. ;-}
-
-V0.19_2     1999.02.06
-  - Added support for threaded perls, thanks to Alan Murray
-    <murray@email.exide.com>
-
-V0.19_1     1998.11.11
-  This is the first test of the forthcoming release 0.20. This is not
-  for public consumption - please use with care.
-
-  - Don't export $sql_dbh etc as default. (Ingperl.pm)
-    Warning:
-       This may break code that uses one or more of:
-          $sql_drh $sql_dbh $sql_sth $sql_debug $sql_rowcount
-       Change:
-          use Ingperl;
-       to:
-          use Ingperl( qw[ $sql_dbh $sql_sth ] );
-  - Added support for updateable cursors (experimental), Thanks to
-    Dirk Koopman <djk@tobit.co.uk>.
-  - Upgrade to support DBI 1.00 (experimental):
-     . re-prepare statement, that have gone out of scope (eq. after a
-       commit/rollback etc). Just first bash at it :-(, ie. for now just
-       keep tabs on whether the statement is invalidated by commit.
-     . add the new meta-data fields (TYPE, SCALE, PRECISION)
-       Ingres doesn't return the SCALE information so that is undef untill
-       further notice!
-     . first bash at type_info_all
-     . added $dbh->table_info (so $dbh->tables also works thanks to DBI)
-     . added $dbh->ping
-  - Changed statement name from stmnt<12-digit-number> to
-    st<number>_<a-bit-of-the-select>, so that it maybe is possible to
-    see which statement is executing from eg. ipm.
-    This may have the adverse effect that Ingres runs out of buffer space,
-    because it leaves all prepared statements in the ???-buffer untill a
-    commit. This will only be a problem if you execute many different
-    statements in a transaction.
-    If this does become a problem please let me know. One solution is to
-    allow the user to define the statement name if neccessary (eg. though
-    the %attribs argument to prepare).
-  - Cleaned up some code here and there.
-  - OpenIngres 1.0 now requires patch 5301 (or later) as this fixes the
-    unfortunate problem with nullability and outerjoins. The code to work
-    around this problem is removed (it had strange sideeffects at times).
-    This should not be a problem for OpenIngres 2.0 or later.
-    It if definitely not a problem for Ingres 6.4; as outerjoins were
-    introduced in OpenIngres.
-####  - Now builds cleanly on VMS (again)
-  - Now commits after inquiring for autocommit-state after connect. This
-    removes the nedd for the commit in:
-        $dbh = DBI->connect...
-        $dbh->commit;
-        $dbh->do("set lockmode....");
-
-(Note #### = Not Yet Implemented)
 
 
 BEFORE BUILDING, TESTING AND INSTALLING this you will need to:

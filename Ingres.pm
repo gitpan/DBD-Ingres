@@ -1,4 +1,4 @@
-#   $Id: Ingres.pm,v 2.121 1999/10/28 11:08:41 ht000 Exp $
+#   $Id: Ingres.pm,v 2.122 1999/10/29 07:14:33 ht000 Exp $
 #
 #   Copyright (c) 1994,1995 Tim Bunce
 #             (c) 1996 Henrik Tougaard
@@ -35,8 +35,8 @@ DBD::Ingres - DBI driver for Ingres database systems
     use DynaLoader ();
     @ISA = qw(DynaLoader);
 
-    $VERSION = '0.23';
-    my $Revision = substr(q$Revision: 2.121 $, 10);
+    $VERSION = '0.24';
+    my $Revision = substr(q$Revision: 2.122 $, 10);
 
     bootstrap DBD::Ingres $VERSION;
 
@@ -121,7 +121,7 @@ DBD::Ingres - DBI driver for Ingres database systems
         my($dbh, $statement, $attribs)= @_;
 	my $ing_readonly = defined($attribs->{ing_readonly}) ?
 		$attribs->{ing_readonly} :
-		scalar $statement !~ /select.*for\s+(?:deferred|direct)?\s*update\s+of/is;
+		scalar $statement !~ /select.*for\s+(?:deferred\s+|direct\s+)?update/is;
 
         # create a 'blank' sth
         my $sth = DBI::_new_sth($dbh, {
@@ -376,6 +376,15 @@ Later you can reexecute the statement without the update-possibility by doing:
     $sth->execute;
 
 and so on. B<Note> that an C<update> will now cause an SQL error.
+
+In fact the "FOR UPDATE" seems to be optional, ie you can update cursors even 
+if their SELECT statements do not contain a C<for update> part.
+
+If you wish to update such a cursor you B<must> include the C<ing_readonly>
+attribute.
+
+B<NOTE> DBD::Ingres version later than 0.19_1 have opened all cursors for
+update. This change breaks that behaviour. Sorry if this breaks your code.
 
 =item ing_statement
 

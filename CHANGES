@@ -1,3 +1,15 @@
+v0.24       1999.10.29
+  The "OF column..." part of the "FOR UPDATE" clause is optional.
+  Clarified the pod (or tried to at least).
+
+  This changes the behaviour of the updateable cursor patch added by
+  Dirk Koopman <djk@tobit.co.uk> in version 0.19_1.  I hope nothing is
+  seriously broken by this change.
+  It does seem the best to let cursors be readonly by default and
+  explicitly change that if you want to update. The update of a cursor
+  without a "FOR UPDATE OF..." clause is not documented and could
+  go away at any time. 
+
 v0.23       1999.10.28
   Now tries to discover whether a select-cursor should be opened READONLY
   or not.
