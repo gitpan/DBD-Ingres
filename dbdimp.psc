@@ -1,5 +1,5 @@
 /*                               -*- Mode: C -*- 
- * $Id: dbdimp.psc,v 2.112 1998/11/08 15:42:22 ht000 Exp $
+ * $Id: dbdimp.psc,v 2.113 1999/05/25 09:53:07 ht000 Exp $
  *
  * Copyright (c) 1994,1995  Tim Bunce
  *           (c) 1996,1997  Henrik Tougaard
@@ -135,6 +135,8 @@ dbd_discon_all(drh, imp_drh)
     SV *drh;
     imp_drh_t *imp_drh;
 {
+    dTHR;
+
     /* Taken directly from DBD::Oracle:dbdimp.c Version 0.47 */
     /* The disconnect_all concept is flawed and needs more work */
     if (!dirty && !SvTRUE(perl_get_sv("DBI::PERL_ENDING",0))) {
@@ -252,12 +254,14 @@ dbd_db_login(dbh, imp_dbh, dbname, user, pass)
     int session;
     char * opt;
     EXEC SQL END DECLARE SECTION;
+    dTHR;
 
     if (dbis->debug >= 2)
         fprintf(DBILOGFP,"DBD::Ingres::dbd_db_login: dbname: %s\n", dbname);
 
     session = imp_dbh->session = nxt_session++;
-
+    imp_dbh->trans_no = 1;
+    
     opt = dbname;
     /* look for options in dbname. Syntax: dbname;options */
     while (*opt && *opt != ';') ++opt;
@@ -339,7 +343,7 @@ dbd_db_commit(dbh, imp_dbh)
     SV* dbh;
     imp_dbh_t* imp_dbh;
 {
-    imp_sth_t* nxt;
+    dTHR;
      
     if (dbis->debug >= 2)
         fprintf(DBILOGFP,"DBD::Ingres::dbd_db_commit\n");
@@ -351,15 +355,8 @@ dbd_db_commit(dbh, imp_dbh)
             SvPV(dbh,na), (int)DBIc_ACTIVE_KIDS(imp_dbh));
     }
 
-    /* run through the chain of statements and mark that they have to
-    ** be re-prepared */
-    nxt = imp_dbh->sth_lst;
-    while (nxt) {
-        dbd_st_finish(0, nxt);
-        nxt->invalid = 1;
-        nxt = nxt->next_sth;
-    }
     set_session(dbh);
+    ++ imp_dbh->trans_no;
     EXEC SQL COMMIT;
     return sql_check(dbh);
 }
@@ -369,7 +366,7 @@ dbd_db_rollback(dbh, imp_dbh)
     SV* dbh;
     imp_dbh_t* imp_dbh;
 {
-    imp_sth_t* nxt;
+    dTHR;
      
     if (dbis->debug >= 2)
         fprintf(DBILOGFP,"DBD::Ingres::dbd_db_rollback\n");
@@ -381,16 +378,9 @@ dbd_db_rollback(dbh, imp_dbh)
             SvPV(dbh,na), (int)DBIc_ACTIVE_KIDS(imp_dbh));
     }
 
-    /* run through the chain of statements and mark that they have to
-    ** be re-prepared */
-    nxt = imp_dbh->sth_lst;
-    while (nxt) {
-        dbd_st_finish(0, nxt);
-        nxt->invalid = 1;
-        nxt = nxt->next_sth;
-    }
 
     set_session(dbh);
+    ++ imp_dbh->trans_no;
     EXEC SQL ROLLBACK;
     return sql_check(dbh);
 }
@@ -464,8 +454,9 @@ dbd_db_disconnect(dbh, imp_dbh)
     EXEC SQL BEGIN DECLARE SECTION;
     int transaction_active;
     EXEC SQL END DECLARE SECTION;
-    DBIc_ACTIVE_off(imp_dbh);
+    dTHR;
 
+    DBIc_ACTIVE_off(imp_dbh);
     if (dbis->debug >= 2)
         fprintf(DBILOGFP,"DBD::Ingres::dbd_db_disconnect\n");
 
@@ -581,6 +572,15 @@ dbd_db_FETCH_attrib(dbh, imp_dbh, keysv)
 
 /* === DBD_ST ======================================================= */
 
+int hash(char *s) {
+    int h = 0;
+    while (*s) {
+        h += (unsigned char)(*s);
+        s++;
+    }
+    return h;
+}
+
 int
 dbd_st_prepare(sth, imp_sth, statement, attribs)
     SV* sth;
@@ -619,6 +619,10 @@ dbd_st_prepare(sth, imp_sth, statement, attribs)
         if (dbis->debug >= 4)
             fprintf(DBILOGFP, "Statement3 = %s \n", p);
         generate_statement_name(&imp_sth->st_num, name);
+        /*imp_sth->st_num = hash(statement);
+        if (dbis->debug >= 4)
+            fprintf(DBILOGFP, "Num = %d \n", imp_sth->st_num);
+        sprintf(name, "s%d", imp_sth->st_num);*/
         if (dbis->debug >= 4)
             fprintf(DBILOGFP, "Name = %s \n", name);
         n = name + strlen(name); /* points at \0 at end */
@@ -698,10 +702,7 @@ dbd_st_prepare(sth, imp_sth, statement, attribs)
         printf("DBD::Ingres::dbd_st_prepare: fields: %d, phs: %d\n",
                 DBIc_NUM_FIELDS(imp_sth), DBIc_NUM_PARAMS(imp_sth));
 
-    /* insert statement in chain */
-    imp_sth->next_sth = imp_dbh->sth_lst;
-    imp_dbh->sth_lst = imp_sth;
-
+    imp_sth->trans_no = imp_dbh->trans_no;
     DBIc_IMPSET_on(imp_sth);
     return 1;
 }
@@ -874,37 +875,37 @@ dbd_bind_ph (sth, imp_sth, param, value, sql_type, attribs, is_inout, maxlen)
          the buffer one int below var->sqldata. */
     case 1: {/* int */
         if (var->sqldata == (char *)&sv_undef) {
-            Newz(42, buf, 3, int);
-            *buf = 3;
-            var->sqldata = (char*) (buf+2);
-        } else if (*buf < 3) {
-            Renew(buf, 3, int);
-            *buf = 3;
-            var->sqldata = (char*) (buf+2);
+            Newz(42, buf, 2, int);
+            *buf = 2;
+            var->sqldata = (char*) (buf+1);
+        } else if (*buf < 2) {
+            Renew(buf, 2, int);
+            *buf = 2;
+            var->sqldata = (char*) (buf+1);
         }
-        buf[2]       = (int)SvIV(value);
+        buf[1]       = (int)SvIV(value);
         var->sqlind  = 0;
         var->sqllen  = 4;
         var->sqltype = IISQ_INT_TYPE;
         break; }
     case 2: {/* float */
-        int    need_int = (sizeof(double) + sizeof(int)-1)/sizeof(int) +2;
+        int    need_int = (sizeof(double) + sizeof(int)-1)/sizeof(int) +1;
         double ptr;
 
         if (var->sqldata == (char *)&sv_undef) {
             Newz(42, buf, need_int, int);
             *buf = need_int;
-            var->sqldata = (char*) (buf+2);
+            var->sqldata = (char*) (buf+1);
         } else if (*buf < need_int) {
             Renew(buf, need_int, int);
             *buf = need_int;
-            var->sqldata = (char*) (buf+2);
+            var->sqldata = (char*) (buf+1);
         }
         ptr = (double)SvNV(value);
         /* Double probably not aligned properly: may cause alignment
            error in Ingres library? Hmm: works for Open Ingres 1.2 and
            Ingres 6.4. Should we spend 8 bytes for the length tag? */
-        Move(&ptr, buf+2, 1, double); 
+        Move(&ptr, buf+1, 1, double); 
         var->sqlind  = 0;
         var->sqllen = 8;
         var->sqltype = IISQ_FLT_TYPE;
@@ -913,18 +914,18 @@ dbd_bind_ph (sth, imp_sth, param, value, sql_type, attribs, is_inout, maxlen)
         STRLEN strlen;
         char   *string  = SvPV(value,strlen);
         int    need_int = ((strlen+1)*sizeof(char) + sizeof(int)-1) /
-                                      sizeof(int) + 2;
+                                      sizeof(int) + 1;
         
         if (var->sqldata == (char *)&sv_undef) { /* initital allocation */
             Newz(42, buf, need_int, int);
             *buf = need_int;
-            var->sqldata = (char *) (buf+2);
+            var->sqldata = (char *) (buf+1);
         } else {
             buf = ((int *) var->sqldata)-1; 
             if (*buf < need_int) { /* need to reallocate? */
                 Renew(buf, need_int, int);
                 *buf = need_int;
-                var->sqldata = (char *) (buf+2);
+                var->sqldata = (char *) (buf+1);
             }
         }
         Move(string, var->sqldata, strlen+1, char);
@@ -935,7 +936,20 @@ dbd_bind_ph (sth, imp_sth, param, value, sql_type, attribs, is_inout, maxlen)
     }
     if (!SvOK(value)) {
         if (dbis->debug >= 3) fprintf(DBILOGFP, "bind(NULL)");
-        var->sqlind = (short*)(((int*)var->sqldata) -1);
+        if (var->sqldata == (char *)&sv_undef) {
+          Newz(42, buf, 2, int);
+          *buf = 2;
+          var->sqldata = (char*) (buf+1);
+        } else if (*buf < 2) {
+          Renew(buf, 2, int);
+          *buf = 2;
+          var->sqldata = (char*) (buf+1);
+        }
+        var->sqlind = (short*)var->sqldata; /* cheat a little - use
+                                            ** var->sqldata as indicator
+                                            ** variable as well - the
+                                            ** actual value is never
+                                            ** used!*/
         *var->sqlind = -1;
         var->sqltype = -var->sqltype;
     }
@@ -951,12 +965,14 @@ dbd_st_execute(sth, imp_sth)    /* <=0 is error, >0 is ok */
     EXEC SQL BEGIN DECLARE SECTION;
     char* name = imp_sth->name;
     EXEC SQL END DECLARE SECTION;
-    
+    dTHR;
+    D_imp_dbh_from_sth;
+ 
     if (dbis->debug >= 2)
         fprintf(DBILOGFP, "DBD::Ingres::dbd_st_execute(%s)\n", imp_sth->name);
 
     /* needs to check for re-prepare (after commit etc.) */
-    if (imp_sth->invalid) {
+    if (imp_sth->trans_no != imp_dbh->trans_no) {
         croak("DBD::Ingres: Attempt to execute a statement after commit");
     }
 
@@ -1014,12 +1030,13 @@ dbd_st_fetch(sth, imp_sth)
     EXEC SQL BEGIN DECLARE SECTION;
     char* name = imp_sth->name;
     EXEC SQL END DECLARE SECTION;
+    D_imp_dbh_from_sth;
 
     if (dbis->debug >= 2)
         fprintf(DBILOGFP,"DBD::Ingres::dbd_st_fetch(%s)\n", imp_sth->name);
 
     /* needs to check for re-prepare (after commit etc.) */
-    if (imp_sth->invalid) {
+    if (imp_sth->trans_no != imp_dbh->trans_no) {
         croak("DBD::Ingres: Attempt to fetch from statement after commit");
     }
 
@@ -1122,6 +1139,7 @@ dbd_st_finish(sth, imp_sth)
     EXEC SQL BEGIN DECLARE SECTION;
     char* name = imp_sth->name;
     EXEC SQL END DECLARE SECTION;
+    dTHR;
     
     /* Cancel further fetches from this cursor.                 */
     if (DBIc_ACTIVE(imp_sth)) {
@@ -1145,7 +1163,6 @@ dbd_st_destroy(sth, imp_sth)
     imp_sth_t *imp_sth;
 {
     int i;
-    imp_sth_t *nxt;
     D_imp_dbh_from_sth;
     
     if (dbis->debug >= 2)
@@ -1156,23 +1173,6 @@ dbd_st_destroy(sth, imp_sth)
 
     /* XXX free contents of imp_sth here */
 
-    /* take this statement out of the chain */
-    nxt = imp_dbh->sth_lst;
-    if (nxt == imp_sth) {
-        /* special case: we are the first sth in the chain */
-        imp_dbh->sth_lst = imp_sth->next_sth;
-    } else {
-        /* find us in the chain */
-        while (nxt && nxt->next_sth != imp_sth) nxt = nxt->next_sth;
-        if (nxt) {
-            /* found */
-            nxt->next_sth = imp_sth->next_sth;
-        } else {
-            /* not found - strange.... */
-            warn("DBD::Ingres: stmt not found in chain");
-        }
-    }
-     
     DBIc_IMPSET_off(imp_sth);
 }
 
@@ -1202,6 +1202,7 @@ dbd_st_STORE_attrib(sth, imp_sth, keysv, valuesv)
     char *key = SvPV(keysv,kl);
     SV *cachesv = NULL;
     int on = SvTRUE(valuesv);
+    dTHR;
 
     if (dbis->debug >=3)
         fprintf(DBILOGFP,"DBD::Ingres::dbd_st_STORE(%s)->{%s}\n",

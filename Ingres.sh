@@ -1,7 +1,7 @@
 #ifndef DBDIMP_H
 #define DBDIMP_H
 /*
-   $Id: Ingres.sh,v 2.104 1998/11/08 15:42:22 ht000 Exp $
+   $Id: Ingres.sh,v 2.105 1999/05/25 09:53:07 ht000 Exp $
 
    Copyright (c) 1994,1995  Tim Bunce
    Copyright (c) 1996,1997  Henrik Tougaard (ht@datani.dk)
@@ -36,14 +36,16 @@ struct imp_dbh_st {
     dbih_dbc_t com;         /* MUST be first element in structure   */
     int        session;     /* session id for this connection */
     imp_sth_t *sth_lst;     /* pointer to first statement in chain */
+    int        trans_no;    /* transaction sequence number, is
+                            ** incremented by 1 at every commit/
+                            ** rollback */
 };
 
 /* Define sth implementor data structure */
 struct imp_sth_st {
     dbih_stc_t com;         /* MUST be first element in structure   */
-    imp_sth_t *next_sth;    /* pointer to next sth in chain */
-    int        invalid;     /* 1 if preparation is invalidated by
-                            **   commit/rollback */
+    int        trans_no;    /* transaction sequence number at start
+                            ** of this statement */
 
     IISQLDA    sqlda;       /* descriptor for statement (select) */
     char      *name;        /* statement name!!! */

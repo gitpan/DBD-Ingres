@@ -1,3 +1,14 @@
+V0.19_3     1999.05.25
+  - Cleanup of the code. Removal of some/all (?!!) of the core dumps.
+    No longer 'unaligned access'.
+  - Redo the check for re-preparation (still croak if a commit/rollback
+    has invalidated the statement).
+
+    Possibly fit for human comsumption. ;-}
+
+V0.19_2     1999.02.06
+  - Added support for threaded perls, thanks to Alan Murray <murray@email.exide.com>
+
 V0.19_1     1998.10.14
   This is the first test of the forthcoming release 0.20. This is not
   for public consumption - please use with care.

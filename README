@@ -4,6 +4,11 @@ This is the Database Driver for the Ingres family of database products.
 It requires Ingres 6.4 or OpenIngres 1.0 or newer,
 DBI 1.00 or newer, Perl5.004 or newer.
 
+Note:
+There are indications of memory corruption problems with Perl5.005_03.
+As of now (1999.05.25) the advice is to use Perl5.005_02.
+
+
    Copyright (c) 1996,1997  Henrik Tougaard <ht@datani.dk>
 
    You may distribute under the terms of either the GNU General Public
@@ -11,21 +16,22 @@ DBI 1.00 or newer, Perl5.004 or newer.
 
 New features:
 
+V0.19_3     1999.05.25
+  - Cleanup of the code. Removal of some/all (?!!) of the core dumps.
+    No longer 'unaligned access'.
+  - Redo the check for re-preparation (still croak if a commit/rollback
+    has invalidated the statement).
+
+    Possibly fit for human comsumption. ;-}
+
+V0.19_2     1999.02.06
+  - Added support for threaded perls, thanks to Alan Murray <murray@email.exide.
+com>
+
 V0.19_1     1998.11.11
   This is the first test of the forthcoming release 0.20. This is not
   for public consumption - please use with care.
 
-  Do please report any problem to me <ht@datani.dk>.
-
-  ********************** Note *****************************
-  This release compiles, makes test and sometimes :-} works almost as
-  expected. At other times it dumps core (for no reason that I can
-  discover yet).
-  On Digital Unix it warns about unaligned access from several places.
-
-  So you are warned!!!
-  **********************************************************
-    
   - Don't export $sql_dbh etc as default. (Ingperl.pm)
     Warning:
        This may break code that uses one or more of:
@@ -143,6 +149,10 @@ dlopen: Unresolved symbols at
 /usr/local/lib/perl5/alpha-dec_osf/5.00404/DynaLoader.pm line 166.
           include '-ldnet_stub' in your abflnk.opt to fix this.
 
+	o Lenio Eric <elenio@mct.rochester.edu> reports problems using
+          GNU-ld on SunOS. The problems disappeared when he reverted to
+          Sun's ld. Message was: "ld.so: Undefined symbol: _IIGCa_static"
+
 TO DO LIST:
 
         o Add support for OpenIngres long datatypes.
@@ -153,7 +163,7 @@ IF YOU HAVE PROBLEMS:
 Firstly, check the Frequently Asked Questions, Known Bugs and any other
 pertinent documents at:
 
-	http://www.arcana.co.uk/technologia/perl/DBI/index.html
+	http://www.symbolstone.org/technology/perl/DBI
 
 If this does *not* resolve your problem, please post details to 
 dbi-user@fugue.com and CC them to me at ht@datani.dk.  

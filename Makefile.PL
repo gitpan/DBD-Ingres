@@ -1,5 +1,5 @@
 #!/usr/local/bin/perl -sw
-# $Id: Makefile.PL,v 2.109 1998/11/08 15:42:22 ht000 Exp $
+# $Id: Makefile.PL,v 2.110 1999/05/25 09:53:07 ht000 Exp $
 
 require 5.004;
 
@@ -27,6 +27,12 @@ my %opts = (
 	       COMPRESS => 'gzip', SUFFIX => 'gz', },
     LINKTYPE => 'dynamic',
     OPTIMIZE => '-g',
+   ($] >= 5.005)
+    ? (
+     'AUTHOR' => 'Henrik Tougaard (ht@datani.dk)',
+     'ABSTRACT_FROM' => 'Ingres.pm',
+    )
+    : (),
 );
 
 # Options, typically only used for debugging
