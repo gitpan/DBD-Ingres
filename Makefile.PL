@@ -1,5 +1,5 @@
 #!/usr/local/bin/perl -sw
-# $Id: Makefile.PL,v 2.107 1997/12/16 08:46:00 ht000 Exp $
+# $Id: Makefile.PL,v 2.108 1998/02/05 13:53:36 ht000 Exp $
 
 require 5.003_93;
 
@@ -77,7 +77,7 @@ for ($linkwith) {
 }
 
 # Try to figure out if this is an OpenIngres or not
-my $OpenIngres = int(-f "$II_SYSTEM/ingres/lib/libcompat.1.so");
+my $OpenIngres = defined(-f "$II_SYSTEM/ingres/lib/libcompat.1.so");
 
 my $linkopt = "";
 

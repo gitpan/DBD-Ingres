@@ -1,5 +1,5 @@
 /*                               -*- Mode: C -*- 
- * $Id: dbdimp.psc,v 2.110 1997/12/16 08:46:00 ht000 Exp $
+ * $Id: dbdimp.psc,v 2.111 1998/02/05 13:53:36 ht000 Exp $
  *
  * Copyright (c) 1994,1995  Tim Bunce
  *           (c) 1996,1997  Henrik Tougaard
@@ -199,7 +199,7 @@ generate_statement_name(st_num)
 	        fprintf(DBILOGFP, " alloc first time");
             num = 0;
             Newz(42, statement_numbers, 8, U32);
-            for(i = statement_max; i <= statement_max+8; i++)
+            for(i = statement_max; i < statement_max+8; i++)
                 statement_numbers[i] = 0;
             statement_max = 8;
         } else {
@@ -207,7 +207,7 @@ generate_statement_name(st_num)
             if (dbis->debug >= 4)
 	        fprintf(DBILOGFP, " alloc to %d", statement_max);
             Renew(statement_numbers, statement_max+8, U32);
-            for(i = statement_max; i <= statement_max+8; i++)
+            for(i = statement_max; i < statement_max+8; i++)
                 statement_numbers[i] = 0;
             statement_max += 8;
         }
@@ -309,6 +309,10 @@ dbd_db_login(dbh, imp_dbh, dbname, user, pass)
             fprintf(DBILOGFP,"DBD::Ingres::dbd_db_connect(AUTOCOMMIT=%d)\n",
                     autocommit_state);
 	DBIc_set(imp_dbh, DBIcf_AutoCommit, autocommit_state);
+        if (autocommit_state) {
+	    EXEC SQL COMMIT;
+	    if (!sql_check(dbh)) return 0;
+	}
     }
     return 1;
 }
@@ -885,6 +889,7 @@ dbd_bind_ph (sth, imp_sth, param, value, sql_type, attribs, is_inout, maxlen)
         break; }
     }
     if (dbis->debug >= 3) dump_sqlda(&imp_sth->ph_sqlda);
+    return 1;
 }
 
 int
@@ -965,6 +970,7 @@ dbd_st_fetch(sth, imp_sth)
     sqlda = &imp_sth->sqlda;
     EXEC SQL FETCH :name USING DESCRIPTOR :sqlda;
     if (sqlca.sqlcode == 100) {
+	dbd_st_finish(sth, imp_sth);
         return Nullav;
     } else
     if (!sql_check(sth)) return Nullav;
@@ -1100,6 +1106,7 @@ dbd_st_blob_read(sth, imp_sth,
     long destoffset;
 {
    die("Ingres: blob_read not (yet) implemented - sorry!");
+   return 0;
 }
 
 int

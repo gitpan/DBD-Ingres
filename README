@@ -77,6 +77,14 @@ KNOWN PROBLEMS:
             database-name username other-options
           otherwise the check for username wil fail.
 
+	o Problems have been reported on Digital Unix where the abflnk.opt
+          files does not include '-ldnet_stub'. This will cause wierd errors
+          during "make test" - somewhat like:
+Can't load './blib/arch/auto/DBD/Ingres/Ingres.so' for module DBD::Ingres:
+dlopen: Unresolved symbols at
+/usr/local/lib/perl5/alpha-dec_osf/5.00404/DynaLoader.pm line 166.
+          include '-ldnet_stub' in your abflnk.opt to fix this.
+
 TO DO LIST:
 
         o Add support for OpenIngres long datatypes.

@@ -1,3 +1,20 @@
+V0.16     1998.02.05
+  - Ulrich Pfeifer found and fixed another couple of memory leaks.
+  - Called dbd_st_finish when dbd_st_fetch returns undef. This avoid the bug
+    reported by  JD Laub <jdl@iasi.com> where the sequence 
+       prepare - execute - fetch - execute 
+    results in an error.
+
+v0.15     1998.01.16
+  - Added '-lm -lc' to the lib list for SCO reported by Alexander Slinkin
+    <sas@arstel.ru>).
+  - Fixed some minor warnings from dbdimp.psc - Digital Unix 4.0b has a
+    good lint in it's C-compiler (Gary W Chapman <gwc1@acf3.nyu.edu>)
+  - Fixed bug that causes DBD::Ingres code to break when used with DBI-0.91s
+    (where Tim Bunce has fixed an autocommit bug). The error occurs when you
+    issue a statement that cannot be in a multi-statement-transaction just
+    after a commit - the test for autocommit has started a transaction.
+
 v0.14     1997.12.16
     Added ChopBlanks test to t/dbi.t
     Ulrich Pfeifer found (and fixed) yet another memory leak in bind_params.
