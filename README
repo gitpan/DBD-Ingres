@@ -15,6 +15,15 @@ As of now (1999.05.25) the advice is to use Perl5.005_02.
    License or the Artistic License, as specified in the Perl README file.
 
 New features:
+v0.22       1999.10.26
+  The 'minor tweaks' to Makefile.PL for building on NT are added, thanks to 
+  Bernard.ROYET@sncf.fr.
+  This release should build cleanly on NT.
+  
+v0.21       1999.09.16
+  It seems that a statement name can only be 23 characters long in Ingres 6.4
+  Fixed, thanks to Bruce W. Hoylman <bhoylma@advtech.uswest.com>.
+
 v0.20       1999.09.01
   This has been running without problems on several machines here for some
   months now. Time to release it and see what (if anything) breaks.
@@ -33,8 +42,8 @@ V0.19_3     1999.05.25
     Possibly fit for human comsumption. ;-}
 
 V0.19_2     1999.02.06
-  - Added support for threaded perls, thanks to Alan Murray <murray@email.exide.
-com>
+  - Added support for threaded perls, thanks to Alan Murray
+    <murray@email.exide.com>
 
 V0.19_1     1998.11.11
   This is the first test of the forthcoming release 0.20. This is not
@@ -77,7 +86,6 @@ V0.19_1     1998.11.11
     This should not be a problem for OpenIngres 2.0 or later.
     It if definitely not a problem for Ingres 6.4; as outerjoins were
     introduced in OpenIngres.
-####  - Now builds cleanly on NT without changes to the makefile.
 ####  - Now builds cleanly on VMS (again)
   - Now commits after inquiring for autocommit-state after connect. This
     removes the nedd for the commit in:

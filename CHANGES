@@ -1,3 +1,8 @@
+v0.22       1999.10.26
+  The 'minor tweaks' to Makefile.PL for building on NT are added, thanks to 
+  Bernard.ROYET@sncf.fr.
+  This release should build cleanly on NT.
+  
 v0.21       1999.09.16
   It seems that a statement name can only be 23 characters long in Ingres 6.4
   Fixed, thanks to Bruce W. Hoylman <bhoylma@advtech.uswest.com>.

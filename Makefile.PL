@@ -1,5 +1,5 @@
 #!/usr/local/bin/perl -sw
-# $Id: Makefile.PL,v 2.110 1999/05/25 09:53:07 ht000 Exp $
+# $Id: Makefile.PL,v 2.111 1999/10/26 06:53:57 ht000 Exp $
 
 require 5.004;
 
@@ -18,6 +18,7 @@ require FileHandle unless defined(&FileHandle::new);
 use DBI 1.00;
 use DBI::DBD;
 my $Is_VMS = $Config{osname} eq 'VMS';
+my $Is_NT = $Config{osname} eq 'MSWin32';
 
 my %opts = (
     NAME => 'DBD::Ingres',
@@ -34,6 +35,7 @@ my %opts = (
     )
     : (),
 );
+$opts{CAPI} = 'TRUE' if $Config{archname} =~ /-object\b/i;
 
 # Options, typically only used for debugging
 $::opt_g = '';		# enable debugging (s/-O/-g/g)
@@ -114,6 +116,8 @@ if ($Is_VMS) {
     $libhome = "";
     $ESQLC = "ESQLC";
     $OpenIngres = 1; # help!!
+} elsif ($Is_NT) {
+    $ESQLC = $ENV{ESQLC} ||"$II_SYSTEM\\ingres\\bin\\esqlc.exe";
 } else {
     # Non-vms checks:
     # See if the ESQL-precompiler exists...
