@@ -9,4 +9,5 @@ Makefile.PL
 MANIFEST
 test.pl
 README
+CHANGES
 

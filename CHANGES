@@ -1,0 +1,4 @@
+V0.0201  1996.12.18
+	Can now link dynamically on Unix
+	 - thanks to Paul Lindner <lindner@itu.int>
+

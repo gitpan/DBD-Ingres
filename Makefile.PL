@@ -1,5 +1,5 @@
 #!/usr/local/bin/perl -sw
-# $Id: Makefile.PL,v 1.5 1996/12/03 08:11:55 ht Exp $
+# $Id: Makefile.PL,v 1.6 1996/12/18 10:44:33 ht Exp $
 
 require 5.003;
 
@@ -23,7 +23,7 @@ my %opts = (
     dist  => { DIST_DEFAULT=> 'clean distcheck disttest ci tardist',
                PREOP => '$(MAKE) -f Makefile.old distdir',
 	       COMPRESS => 'gzip', SUFFIX => 'gz', },
-    LINKTYPE => 'static',
+    LINKTYPE => 'dynamic',
     OPTIMIZE => '-g',
 );
 
@@ -56,8 +56,8 @@ my $II = $ENV{II_SYSTEM};
 
 print "Using Ingres in $II\n";
 
-my $libhome = "-L$II/ingres/lib";
-my $linkwith = "-lingres";
+my $libhome = "";
+my $linkwith = "-L$II/ingres/lib -lingres";
 my $linkopt = "";
 
 # --- Handle special cases ---
@@ -79,7 +79,6 @@ if ($Config{osname} eq 'dec_osf') {
 if ($Config{osname} eq 'VMS') {
     $opts{OPTIMIZE} = "/optimize/nowarning";
     $opts{CCCDLFLAGS}="/nowarning";
-    $opts{LINKTYPE} = "dynamic";
     $linkopt = "II_SYSTEM:[ingres.files]esql.opt/opt";
     $linkwith = "";
     $libhome = "";
