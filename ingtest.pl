@@ -1,3 +1,4 @@
+#!/usr/bin/perl -w
 # example.pl - an example of ingperl usage
 
 $| = 1;

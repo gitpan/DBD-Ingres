@@ -1,5 +1,5 @@
 /*                               -*- Mode: C -*- 
- * $Id: dbdimp.psc,v 2.116 1999/11/19 09:04:31 ht000 Exp $
+ * $Id: //depot/tilpasninger/dbd-ingres/dbdimp.psc#3 $
  *
  * Copyright (c) 1994,1995  Tim Bunce
  *           (c) 1996,1997  Henrik Tougaard
@@ -12,7 +12,7 @@
  * have some (small) chance of success in the Ingres world.
  *
  * The blame for this abuse of Tim Bunce's good code lies solely on
- * me: ht@datani.dk.
+ * me: htoug@cpan.org
  *
  */
 

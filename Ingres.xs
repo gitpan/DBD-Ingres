@@ -1,8 +1,8 @@
 /*
-#   $Id: Ingres.xs,v 2.102 1997/09/25 11:46:36 ht000 Exp $
+#   $Id: //depot/tilpasninger/dbd-ingres/Ingres.xs#2 $
 #
 #   Copyright (c) 1994,1995,1996,1997  Tim Bunce
-#   Modified for DBD::Ingres by Henrik Tougaard <ht@datani.dk>
+#   Modified for DBD::Ingres by Henrik Tougaard <htoug@cpan.org>
 #
 #   You may distribute under the terms of either the GNU General Public
 #   License or the Artistic License, as specified in the Perl README file.

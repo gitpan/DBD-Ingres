@@ -1,5 +1,5 @@
 #!/usr/local/bin/perl -sw
-# $Id: Makefile.PL,v 2.112 2000/01/31 07:43:32 ht000 Exp $
+# $Id: //depot/tilpasninger/dbd-ingres/Makefile.PL#2 $
 
 require 5.004;
 
@@ -30,7 +30,7 @@ my %opts = (
     OPTIMIZE => '-g',
    ($] >= 5.005)
     ? (
-     'AUTHOR' => 'Henrik Tougaard (ht@datani.dk)',
+     'AUTHOR' => 'Henrik Tougaard (htoug@cpan.org)',
      'ABSTRACT_FROM' => 'Ingres.pm',
     )
     : (),

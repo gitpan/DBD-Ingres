@@ -1,5 +1,4 @@
-#
-# $Id: Ingperl.pm,v 2.104 1998/11/08 15:42:22 ht000 Exp $
+# $Id: //depot/tilpasninger/dbd-ingres/Ingperl.pm#1 $ $DateTime: 2000/09/14 08:49:49 $ $Revision: #1 $
 #
 # Ingperl emulation interface for DBD::Ingres
 #
@@ -7,7 +6,7 @@
 # Ingres interface, as defined in the Ingperl 2.1 module by
 # Tim Bunce <Tim.Bunce@ig.co.uk>
 #
-# Writte by Henrik Tougaard <ht@datani.dk>
+# Written by Henrik Tougaard <htoug@cpan.org>
 #
 
 use DBD::Ingres;
@@ -17,7 +16,7 @@ use DBI 0.73;
 use Exporter;
 use Carp;
 
-$VERSION = substr(q$Revision: 2.104 $, 10);
+$VERSION = substr(q$Revision: #1 $, 8)/100;
 
 @ISA = qw(Exporter);
 
@@ -264,13 +263,13 @@ Ingperl - Perl access to Ingres databases for old ingperl scripts
      &sql_exec('...');
      @values = &sql_fetch;
      &sql_close;
-     
+
      @types = &sql_types;
      @ingtypes = &sql_ingtypes;
      @lengths = &sql_lengths;
      @nullable = &sql_nullable;
      @names = &sql_names;
-     
+
      $sql_version
      $sql_error
      $sql_sqlcode
@@ -278,7 +277,7 @@ Ingperl - Perl access to Ingres databases for old ingperl scripts
      $sql_readonly
      $sql_showerrors
      $sql_debug
-     
+
      @row1 = &sql_eval_row1('select ...');
      @col1 = &sql_eval_col1('select ...');
 
@@ -315,7 +314,7 @@ This functions should be used to
 =item connect to a database:
 
     &sql("connect database_name [-sqloptions]");
-    
+
 where sqloptions are the options defined in the manual
 for the sql command.
 
@@ -666,7 +665,7 @@ It is quite possible, indeed probable, that some differences in
 behaviour will exist. This should be confined to error handling.
 
 B<All> differences in behaviour which are not documented here should be
-reported to ht@datani.dk and CC'd to dbi-users@fugue.com.
+reported to htoug@cpan.org and CC'd to dbi-users@isc.com.
 
 
 =head1 SEE ALSO
@@ -694,7 +693,7 @@ Formerly sqlperl by Ted Lemon.
 Perl4 version developed and maintained by Tim Bunce,
 <Tim.Bunce@ig.co.uk> Copyright 1994 Tim Bunce and Ted Lemon 
 
-Ingperl emulation using DBD::Ingres by Henrik Tougaard <ht@datani.dk>
+Ingperl emulation using DBD::Ingres by Henrik Tougaard <htoug@cpan.org>
 
 Perl by Larry Wall <lwall@netlabs.com>.
 

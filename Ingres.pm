@@ -1,7 +1,6 @@
-#   $Id: Ingres.pm,v 2.123 1999/11/19 09:04:31 ht000 Exp $
+# $Id: //depot/tilpasninger/dbd-ingres/Ingres.pm#2 $ $DateTime: 2000/11/20 10:05:47 $ $Revision: #2 $
 #
-#   Copyright (c) 1994,1995 Tim Bunce
-#             (c) 1996 Henrik Tougaard
+#   Copyright (c) 1996-2000 Henrik Tougaard
 #
 #   You may distribute under the terms of either the GNU General Public
 #   License or the Artistic License, as specified in the Perl README file.
@@ -35,8 +34,8 @@ DBD::Ingres - DBI driver for Ingres database systems
     use DynaLoader ();
     @ISA = qw(DynaLoader);
 
-    $VERSION = '0.25';
-    my $Revision = substr(q$Revision: 2.123 $, 10);
+    $VERSION = '0.26';
+    my $Revision = substr(q$Change: 1389 $, 8)/100;
 
     bootstrap DBD::Ingres $VERSION;
 
@@ -138,9 +137,9 @@ DBD::Ingres - DBI driver for Ingres database systems
     sub table_info {
         my ($dbh) = @_;
         my $sth = $dbh->prepare("
-          SELECT null, table_owner, table_name, 'TABLE'
-          FROM IITABLES
-          WHERE table_type ='T'
+	  SELECT VARCHAR(null) AS TABLE_CAT, table_owner AS TABLE_SCHEM,	                 table_name, 'TABLE' AS TABLE_TYPE
+	  FROM IITABLES                      
+	  WHERE table_type='T'
           UNION
           SELECT null, table_owner, table_name, 'VIEW'
           FROM IITABLES
@@ -561,6 +560,6 @@ DBI/DBD was developed by Tim Bunce, <Tim.Bunce@ig.co.uk>, who also
 developed the DBD::Oracle that is the closest we have to a generic DBD
 implementation.
 
-Henrik Tougaard, <ht@datani.dk> developed the DBD::Ingres extension.
+Henrik Tougaard, <htoug@cpan.org> developed the DBD::Ingres extension.
 
 =cut

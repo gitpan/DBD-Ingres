@@ -10,6 +10,15 @@ DBI 1.00 or newer, Perl5.004 or newer.
    License or the Artistic License, as specified in the Perl README file.
 
 New features (See the CHANGES file for a complete list):
+v0.26       2000.11.20
+  $dbh->table_info raised an Ingres error because of the null. This
+  has been worked around (Thanks to Dirk Kraemer <kraemer@rz.uni-kiel.de>).
+  Minor changes due to change of internal version control system from CVS
+  to Perforce.
+  Changed my old (now disfunctional) mail adress to the new (and hopefully
+  permanent one: htoug@cpan.org).
+  Removed some (2) occurences of \r in the code.
+
 v0.25       2000.01.31
   Included patches for autodetect of OpenIngres on VMS, thanks to Sebastian
   Bazley <Sebastian.BAZLEY@sema.co.uk>; Now build cleanly on VMS with DBI1.00.
@@ -17,39 +26,6 @@ v0.25       2000.01.31
   recomendation.
   Changed the error return value of execute to 0 (not 0E0 which is the OK
   with 0 rows), not -1, or -2 as it was. Wonder why though?
-
-v0.24       1999.10.29
-  The "OF column..." part of the "FOR UPDATE" clause is optional.
-  Clarified the pod (or tried to at least).
-
-  This changes the behaviour of the updateable cursor patch added by
-  Dirk Koopman <djk@tobit.co.uk> in version 0.19_1.  I hope nothing is
-  seriously broken by this change.
-  It does seem the best to let cursors be readonly by default and
-  explicitly change that if you want to update. The update of a cursor
-  without a "FOR UPDATE OF..." clause is not documented and could
-  go away at any time.
-
-v0.23       1999.10.28
-  Now tries to discover whether a select-cursor should be opened READONLY 
-  or not.
-  A select is opened READONLY unless there is a FOR UPDATE clause in the
-  select statement. This is done by a regexp in Ingres.pm, which might in
-  some cases (I just can't imagine which :-) could possibly give a false
-  positive - which will cause the select to take exclusive locks.
-  To allow the user to override the automatic readonly discovery is it
-  possible to write:
-      $sth = $dbh->prepare("Select....", {ing_readonly => $value});
-  
-v0.22       1999.10.26
-  The 'minor tweaks' to Makefile.PL for building on NT are added, thanks to 
-  Bernard.ROYET@sncf.fr.
-  This release should build cleanly on NT.
-  
-v0.21       1999.09.16
-  It seems that a statement name can only be 23 characters long in Ingres 6.4
-  Fixed, thanks to Bruce W. Hoylman <bhoylma@advtech.uswest.com>.
-
 
 BEFORE BUILDING, TESTING AND INSTALLING this you will need to:
 
@@ -71,20 +47,19 @@ BUILDING
     Then do:
 
 	make
-	make test
+	DBI_DSN=<my-favourite-test-database> make test
 	make install
 
     HP-UX users (and others) will have to build perl with static
     extensions:
         make perl
-        make test
+        DBI_DSN=<my-favourite-test-database> make test
         make inst_perl
     See the MakeMaker docs for further: perldoc ExtUtils::MakeMaker
 
-The make test pass will ask for at databasename (if not given in one of
-the DBI environment variable (see DBI.pm for particulars). It will then
-create a table named 'testhththt' in this database, manipulate it and
-delete it again.
+For the test-run *PLEASE* do remember to give the database name.
+The test pass will create a table named 'testhththt' in this database,
+manipulate it and delete it again.
 It is important for the succes of the test that you have the neccesary
 Ingres permissions.
 
@@ -147,7 +122,7 @@ pertinent documents at:
 	http://www.symbolstone.org/technology/perl/DBI
 
 If this does *not* resolve your problem, please post details to 
-dbi-user@fugue.com and CC them to me at ht@datani.dk.  
+dbi-user@fugue.com and CC them to me at htoug@cpan.org
 Please include:
 
 1. A complete log of a complete build, e.g.:
@@ -171,9 +146,6 @@ Please include:
 
 6. If you are not currently subscribed to the mailing list please
    subscribe via http://www.isc.org/dbi-lists.html
-
-Regards,
-Tim, Al & Henrik.
 
 
 Original document: (c)Tim Bunce

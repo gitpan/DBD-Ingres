@@ -1,10 +1,10 @@
 #ifndef DBDIMP_H
 #define DBDIMP_H
 /*
-   $Id: Ingres.sh,v 2.105 1999/05/25 09:53:07 ht000 Exp $
+   $Id: //depot/tilpasninger/dbd-ingres/Ingres.sh#2 $
 
    Copyright (c) 1994,1995  Tim Bunce
-   Copyright (c) 1996,1997  Henrik Tougaard (ht@datani.dk)
+   Copyright (c) 1996,1997  Henrik Tougaard (htoug@cpan.org)
    				Ingres modifications
    
    You may distribute under the terms of either the GNU General Public

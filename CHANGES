@@ -1,3 +1,13 @@
+$Id: //depot/tilpasninger/dbd-ingres/CHANGES#3 $ $DateTime: 2000/11/20 10:05:47 $ $Revision: #3 $
+
+v0.26       2000.11.20
+  $dbh->table_info raised an Ingres error because of the null. This
+  has been worked around (Thanks to Dirk Kraemer <kraemer@rz.uni-kiel.de>).
+  Minor changes due to change from CVS to Perforce.
+  Changed my old (now disfunctional) mail adress to the new (and hopefully
+  permanent one: htoug@cpan.org).
+  Removed some (2) occurences of \r in the code.
+
 v0.25       2000.01.31
   Included patches for autodetect of OpenIngres on VMS, thanks to Sebastian
   Bazley <Sebastian.BAZLEY@sema.co.uk>
