@@ -1,4 +1,4 @@
-#   $Id: Ingres.pm,v 2.111 1997/12/02 07:53:50 ht000 Exp $
+#   $Id: Ingres.pm,v 2.112 1997/12/16 08:46:00 ht000 Exp $
 #
 #   Copyright (c) 1994,1995 Tim Bunce
 #             (c) 1996 Henrik Tougaard
@@ -6,7 +6,7 @@
 #   You may distribute under the terms of either the GNU General Public
 #   License or the Artistic License, as specified in the Perl README file.
 
-require 5.00390;
+require 5.004;
 
 =head1 NAME
 
@@ -30,12 +30,12 @@ DBD::Ingres - Ingres access interface for Perl5
 {
     package DBD::Ingres;
 
-    use DBI 0.90;
+    use DBI 0.91;
     use DynaLoader ();
     @ISA = qw(DynaLoader);
 
-    $VERSION = '0.13';
-    my $Revision = substr(q$Revision: 2.111 $, 10);
+    $VERSION = '0.14';
+    my $Revision = substr(q$Revision: 2.112 $, 10);
 
     bootstrap DBD::Ingres $VERSION;
 
@@ -126,12 +126,12 @@ DBD::Ingres - Ingres access interface for Perl5
             'ing_statement' => $statement,
             });
 
-        if ($statement !~ m/\bselect\b/i) {
-		$attribs->{"ing_outerjoin"} =
-		      $statement =~ m/\bleft\s*join\b/is ||
-		      $statement =~ m/\bright\s*join\b/is ||
-		      $statement =~ m/\bouter\s*join\b/is
-			unless defined $attribs->{"ing_outerjoin"};
+        if ($statement !~ m/\b[Ss][Ee][Ll][Ee][Cc][Tt]\b/) {
+	    $attribs->{"ing_outerjoin"} =
+	      $statement =~ m/\b[Ll][Ee][Ff][Tt]\s*[Jj][Oo][Ii][Nn]\b/s ||
+	      $statement =~ m/\b[Rr][Ii][Gg][Hh][Tt]\s*[Jj][Oo][Ii][Nn]\b/s ||
+	      $statement =~ m/\b[Oo][Uu][Tt][Ee][Rr]\s*[Jj][Oo][Ii][Nn]\b/s
+                 unless defined $attribs->{"ing_outerjoin"};
 	}
 
         DBD::Ingres::st::_prepare($sth, $statement, $attribs)
@@ -299,7 +299,7 @@ Note that money and date fields will have length returned as 0.
 C<$sth-E<gt>{SqlLen}> is the same as C<$sth-E<gt>{ing_lengths}>,
 but the use of it is depreceated.
 
-=item ing_types
+=item ing_sqltypes
 
     $sth->{ing_sqltypes}              (\@)
 
@@ -348,7 +348,18 @@ Not implemented
 DBD::Ingres should warn when a commit or rollback is isssued on a $dbh
 with open cursors.
 
-Possibly a commit/rollback should also undef the $sth's
+Possibly a commit/rollback should also undef the $sth's. (This should
+probably be done in the DBI-layer as other drivers will have the same
+problems).
+
+=item Procedure calls
+
+It is not possible to call database procedures from DBD::Ingres.
+
+A solution is underway for support for procedure calls from the DBI.
+Until that is defined procedure calls can be implemented as a
+DB::Ingres-specific function (like L<get_event>) if the need arises and
+someone is willing to do it.
 
 =item OpenIngres new features
 

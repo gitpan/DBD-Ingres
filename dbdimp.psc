@@ -1,5 +1,5 @@
 /*                               -*- Mode: C -*- 
- * $Id: dbdimp.psc,v 2.109 1997/12/02 07:53:50 ht000 Exp $
+ * $Id: dbdimp.psc,v 2.110 1997/12/16 08:46:00 ht000 Exp $
  *
  * Copyright (c) 1994,1995  Tim Bunce
  *           (c) 1996,1997  Henrik Tougaard
@@ -78,7 +78,6 @@ sql_check(h)
         EXEC SQL INQUIRE_INGRES(:errbuf = ERRORTEXT);
 	{ /* remove trailing "\n" */
 	   int i = strlen(errbuf)-1;
-if (dbis->debug >= 4) fprintf(DBILOGFP, "last char = '%d', ", errbuf[i]);
 	   while ((errbuf[i] == '\n' || errbuf[i] == ' ') && i > 1) {
 		errbuf[i] = 0;
 		--i;
@@ -229,7 +228,8 @@ fbh_dump(fbh, i)
 {
     fprintf(DBILOGFP, "fbh_dump:");
     fprintf(DBILOGFP, "fbh %d: '%s' %s, ",
-                i, fbh->var->sqlname.sqlnamec, (fbh->nullable) ? "NULLable" : "");
+            i, fbh->var->sqlname.sqlnamec,
+            (fbh->nullable) ? "NULLable" : "");
     fprintf(DBILOGFP, "type %d,  origlen %d, len %d\n",
             fbh->origtype, fbh->origlen, fbh->len);
     fprintf(DBILOGFP, "       VAR: type: %d, len: %d, ind: %p\n",
@@ -254,7 +254,7 @@ dbd_db_login(dbh, imp_dbh, dbname, user, pass)
     EXEC SQL END DECLARE SECTION;
 
     if (dbis->debug >= 2)
-        fprintf(DBILOGFP,"DBD::Ingres::dbd_db_login: database: %s\n", dbname);
+        fprintf(DBILOGFP,"DBD::Ingres::dbd_db_login: dbname: %s\n", dbname);
 
     session = imp_dbh->session = nxt_session++;
 
@@ -417,11 +417,16 @@ dbd_db_get_dbevent(dbh, imp_dbh, wait)
     if (!*event_name)    return (&sv_undef);
     result = newHV();
 
-    hv_store(result, "name",     sizeof("name")    -1, newSVpv(event_name,    0),0);
-    hv_store(result, "database", sizeof("database")-1, newSVpv(event_database,0),0);
-    hv_store(result, "text",     sizeof("text")    -1, newSVpv(event_text,    0),0);
-    hv_store(result, "owner",    sizeof("owner")   -1, newSVpv(event_owner,   0),0);
-    hv_store(result, "time",     sizeof("time")    -1, newSVpv(event_time,    0),0);
+    hv_store(result, "name",     sizeof("name")    -1,
+    	newSVpv(event_name,    0),0);
+    hv_store(result, "database", sizeof("database")-1,
+    	newSVpv(event_database,0),0);
+    hv_store(result, "text",     sizeof("text")    -1,
+    	newSVpv(event_text,    0),0);
+    hv_store(result, "owner",    sizeof("owner")   -1,
+    	newSVpv(event_owner,   0),0);
+    hv_store(result, "time",     sizeof("time")    -1,
+    	newSVpv(event_time,    0),0);
     return(sv_2mortal(newRV_noinc((SV*)result)));
 }
 }
@@ -531,8 +536,9 @@ dbd_db_FETCH_attrib(dbh, imp_dbh, keysv)
 	EXEC SQL SELECT INT4(DBMSINFO('AUTOCOMMIT_STATE'))
 	    INTO :autocommit_state;
     	if (dbis->debug >= 3)
-            fprintf(DBILOGFP,"DBD::Ingres::dbd_db_FETCH(AUTOCOMMIT=%d)sqlca=%d\n",
-                    autocommit_state, sqlca.sqlcode);
+            fprintf(DBILOGFP,
+            	"DBD::Ingres::dbd_db_FETCH(AUTOCOMMIT=%d)sqlca=%d\n",
+                autocommit_state, sqlca.sqlcode);
 	DBIc_set(imp_dbh, DBIcf_AutoCommit, autocommit_state);
         retsv = newSVsv(boolSV(autocommit_state));
         cacheit = FALSE;   /* Don't cache AutoCommit state - some
@@ -571,7 +577,7 @@ dbd_st_prepare(sth, imp_sth, statement, attribs)
 
     if (attribs) {
 	SV **svp;
-	DBD_ATTRIB_GET_BOOL(attribs, "ing_outerjoin",13,
+	DBD_ATTRIB_GET_BOOL(attribs, "ing_outerjoin", 13,
 	    svp, imp_sth->outerjoin);
     }
     imp_sth->done_desc = 0;
@@ -583,7 +589,7 @@ dbd_st_prepare(sth, imp_sth, statement, attribs)
     
     if (dbis->debug >= 3)
         fprintf(DBILOGFP,
-            "DBD::Ingres::dbd_st_prepare statement('%s') name is %s, sqlda: %p\n",
+            "DBD::Ingres::dbd_st_prepare stmt('%s') name:%s, sqlda: %p\n",
             statement, name, sqlda);
 
     set_session(DBIc_PARENT_H(imp_sth));
@@ -608,7 +614,8 @@ dbd_st_prepare(sth, imp_sth, statement, attribs)
 	        in_literal = ~in_literal;
 	    else if (*src == '\'' && !in_literal && !in_comment)
 	        in_string = ~in_string;
-            else if (*src == '/' && src[1] == '*' && !in_literal && !in_string)
+            else if (*src == '/' && src[1] == '*' &&
+                    !in_literal && !in_string)
                 in_comment = 1;
             else if (in_comment && *src == '*' && src[1] == '/')
                 in_comment = 0;
@@ -617,7 +624,7 @@ dbd_st_prepare(sth, imp_sth, statement, attribs)
 	    ++src;
         }
     }
-    if (DBIc_NUM_PARAMS(imp_sth) > 1) {
+    if (DBIc_NUM_PARAMS(imp_sth) > 0) {
         IISQLDA *sqlda = &imp_sth->ph_sqlda;
         strcpy(sqlda->sqldaid, "SQLDA   ");
         sqlda->sqldabc = sizeof(IISQLDA);
@@ -692,7 +699,6 @@ dbd_describe(sth, imp_sth)
         case IISQ_INT_TYPE:
             fbh->len = var->sqllen = sizeof(int);
             strcpy(fbh->type, "d");
-            /*Newc(42, var->sqldata, 1, long, char);*/
             Newz(42, fbh->var_ptr.iv, 1, int);
             var->sqldata = (char*)fbh->var_ptr.iv;
             fbh->sv = NULL;
@@ -702,7 +708,6 @@ dbd_describe(sth, imp_sth)
             fbh->len = var->sqllen = sizeof(double);
             var->sqltype = IISQ_FLT_TYPE;
             strcpy(fbh->type, "f");
-            /*Newc(42, var->sqldata, 1, double, char);*/
             Newz(42, fbh->var_ptr.nv, 1, double);
             var->sqldata = (char*)fbh->var_ptr.nv;
             fbh->sv = NULL;
@@ -725,16 +730,19 @@ dbd_describe(sth, imp_sth)
             fbh->var_ptr.pv = var->sqldata;
             break;
         default:        /* oh dear! */
-            croak("Ingres: field %d has unsupported type %d\n",i+1,var->sqltype);
+            croak("Ingres: field %d has unsupported type %d\n",
+                  i+1, var->sqltype);
             break;
         }
 
         if (fbh->nullable) {
             var->sqlind = &fbh->indic;
-            var->sqltype = - var->sqltype; /* changed sign indicates nullable */
+            var->sqltype = - var->sqltype;
+                    /* changed sign indicates nullable */
         } else {
             var->sqlind = (short *)0;   /* no indicator variable*/
-            fbh->indic = 0;             /* so that we can use this as an indicator variable later */
+            fbh->indic = 0;
+                 /* so that we can use this as an indicator variable later */
         }
         if (dbis->debug >= 2) {
             fprintf(DBILOGFP, "dumping it\n");
@@ -743,7 +751,8 @@ dbd_describe(sth, imp_sth)
     } /* end allocation of field-data */
 
     if (dbis->debug >= 2)
-        fprintf(DBILOGFP,"DBD::Ingres::dbd_st_describe(%s) finished\n", imp_sth->name);
+        fprintf(DBILOGFP,"DBD::Ingres::dbd_st_describe(%s) finished\n",
+                imp_sth->name);
 
     return 1;
 }
@@ -763,7 +772,8 @@ dbd_bind_ph (sth, imp_sth, param, value, sql_type, attribs, is_inout, maxlen)
     int param_no;
     int type = 0;  /* 1: int, 2: float, 3: string */
     IISQLVAR* var;
-
+    int* buf;
+    
     if (SvNIOK(param) ) {	/* passed as a number	*/
 	param_no = (int)SvIV(param);
     } else {
@@ -782,6 +792,7 @@ dbd_bind_ph (sth, imp_sth, param, value, sql_type, attribs, is_inout, maxlen)
         imp_sth->ph_sqlda.sqld = param_no;
 
     var = &imp_sth->ph_sqlda.sqlvar[param_no-1];
+    buf = ((int *) var->sqldata)-1;
     if (sql_type) {
     	switch (sql_type) {
 	case SQL_INTEGER:
@@ -798,7 +809,8 @@ dbd_bind_ph (sth, imp_sth, param, value, sql_type, attribs, is_inout, maxlen)
 	    type = 3; break;
 	}
     } else if (!SvOK(value)) { /* NULL */
-	croak("Ingres(bind_param): sorry NULLs not allowed unless TYPE defined");
+	croak(
+	   "Ingres(bind_param): sorry NULLs not allowed unless TYPE defined");
     } else if (SvIOK(value)) { /* integer */
 	type = 1;
     } else if (SvNOK(value)) { /* float */
@@ -812,8 +824,6 @@ dbd_bind_ph (sth, imp_sth, param, value, sql_type, attribs, is_inout, maxlen)
       /* Poor mans memory management: We store the actual length of
          the buffer one int below var->sqldata. */
     case 1: {/* int */
-        int* buf = ((int *) var->sqldata)-1;
-
         if (var->sqldata == (char *)&sv_undef) {
           Newz(42, buf, 2, int);
           *buf = 2;
@@ -829,8 +839,7 @@ dbd_bind_ph (sth, imp_sth, param, value, sql_type, attribs, is_inout, maxlen)
         var->sqltype = IISQ_INT_TYPE;
 	break; }
     case 2: {/* float */
-        int*   buf      = ((int *) var->sqldata)-1;
-        int    need_int = (sizeof(int) + sizeof(double)+1)/sizeof(int);
+        int    need_int = (sizeof(double) + sizeof(int)-1)/sizeof(int) +1;
 	double ptr;
 
         if (var->sqldata == (char *)&sv_undef) {
@@ -854,8 +863,8 @@ dbd_bind_ph (sth, imp_sth, param, value, sql_type, attribs, is_inout, maxlen)
     case 3: {/* string */
         STRLEN strlen;
         char   *string  = SvPV(value,strlen);
-        int    *buf     = ((int *) var->sqldata)-1;
-        int    need_int = (strlen * sizeof(char)+sizeof(int)+1)/sizeof(int);
+        int    need_int = ((strlen+1)*sizeof(char) + sizeof(int)-1) /
+                                      sizeof(int) + 1;
         
         if (var->sqldata == (char *)&sv_undef) { /* initital allocation */
           Newz(42, buf, need_int, int);
@@ -869,7 +878,7 @@ dbd_bind_ph (sth, imp_sth, param, value, sql_type, attribs, is_inout, maxlen)
             var->sqldata = (char *) (buf+1);
           }
         }
-        Move(string, var->sqldata, strlen, char);
+        Move(string, var->sqldata, strlen+1, char);
         var->sqlind = 0;
         var->sqllen  = strlen;
         var->sqltype = IISQ_CHA_TYPE;
@@ -921,7 +930,8 @@ dbd_st_execute(sth, imp_sth)	/* <=0 is error, >0 is ok */
 
         EXEC SQL DECLARE :name CURSOR FOR :name;
         if (imp_sth->ph_sqlda.sqld > 0) {
-            EXEC SQL OPEN :name FOR READONLY USING DESCRIPTOR &imp_sth->ph_sqlda;
+            EXEC SQL OPEN :name FOR READONLY
+                 USING DESCRIPTOR &imp_sth->ph_sqlda;
         } else {
             EXEC SQL OPEN :name FOR READONLY;
         }
@@ -979,12 +989,13 @@ dbd_st_fetch(sth, imp_sth)
 	} else {
             switch (fbh->type[0]) {
             case 'd':
-                sv_setsv(sv, newSViv((IV)*(int*)var->sqldata));
+                sv_setiv(sv, (IV)*(int*)var->sqldata);
                 if (dbis->debug >= 3)
-                    fprintf(DBILOGFP, "Int: %ld %d %d\n", SvIV(sv), fbh->var_ptr.iv, *(int*)var->sqldata);
+                    fprintf(DBILOGFP, "Int: %ld %d %d\n",
+                          SvIV(sv), fbh->var_ptr.iv, *(int*)var->sqldata);
                 break;
             case 'f':
-                sv_setsv(sv, newSVnv(*(double*)var->sqldata));
+                sv_setnv(sv, *(double*)var->sqldata);
                 if (dbis->debug >= 3)
                     fprintf(DBILOGFP, "Double: %lf\n", SvNV(sv));
                 break;
@@ -1068,7 +1079,8 @@ dbd_st_destroy(sth, imp_sth)
     int i;
 
     if (dbis->debug >= 2)
-        fprintf(DBILOGFP,"DBD::Ingres::dbd_st_destroy(%s)\n", imp_sth->name);
+        fprintf(DBILOGFP,"DBD::Ingres::dbd_st_destroy(%s)\n",
+            imp_sth->name);
 
     release_statement(imp_sth->st_num);
      
@@ -1103,7 +1115,8 @@ dbd_st_STORE_attrib(sth, imp_sth, keysv, valuesv)
     int on = SvTRUE(valuesv);
 
     if (dbis->debug >=3)
-        fprintf(DBILOGFP,"DBD::Ingres::dbd_st_STORE(%s)->{%s}\n", imp_sth->name, key);
+        fprintf(DBILOGFP,"DBD::Ingres::dbd_st_STORE(%s)->{%s}\n",
+                imp_sth->name, key);
 
     return FALSE; /* no values to store */
     

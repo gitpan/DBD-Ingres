@@ -6,72 +6,22 @@ DBD::Ingres --  an Ingres interface for Perl 5 using DBI.
    License or the Artistic License, as specified in the Perl README file.
 
 New features:
-v0.13:
-    Found (one of the) AutoCommit bug(s)! Needs an update to DBI to work 
-    properly. (Autocommit state is not initialized). 
+
+v0.14     1997.12.16
+    Added ChopBlanks test to t/dbi.t
+    Ulrich Pfeifer found (and fixed) yet another memory leak in bind_params.
+    Reworked the code so that it also works on machines wheres ints are
+    not 4 bytes long.
+    Truncated some long lines (so they fit in an 80 char windows).
+    Documented lack of procedure call.
+    Fixed the VMS build problem - nobody needed it. Am I the only one that
+    uses Ingres, Perl and VMS??
+
+v0.13     1997.11.28
+    Found (one of the) AutoCommit bug(s)! Needs an update to DBI to work
+    properly. (Autocommit state is not initialized).
     Fixed serious memory leak in binding core (Thanks to Ulrich Pfeifer).
 
-v0.12:
-    Remove the trailing "\n" from Ingres error messages, so that
-    $dbh->{RaiseError} and $dbh->{PrintError} can return a stack-traceback.
-    Add tests to dbi.t for {AutoCommit}, and get autocommitstate at connect-
-    time. (Ulrich Pfeifer).
-    Return UNDEF from $dbh->execute when errors occur. (Ulrich Pfeifer).
-
-v0.11:
-    Bug in Ingperl.pm &sql_fetch used $sth instead of $sql_sth - funny
-    that nobody noticed before now.
-
-v0.10:
-   o Support for placeholders and binding.
-     You can now do:
-       use DBI qw(:sql_types);
-       ....
-       $sth = $dbh->prepare("insert into tab(c1, c2) values(?, ?)");
-       $sth->bind_param(1, "col 1", SQL_CHAR);
-       $sth->bind_param(2, 2, SQL_INTEGER);
-       $sth->execute;
-       $sth->bind_param(2, 7, SQL_INTEGER);
-       $sth->execute;
-     (with appropriate errorchecks :) and have inserted two rows:
-        'col 1', 2
-        'col 1', 7
-     Binding can be used in most statements. See the SQL Reference
-     Manual for details.
-
-   o A function for retrieving database events has been added.
-     See Ingres.pm for details.
-     A general event-handling method has not been defined in the DBI
-     (yet). This function is intended as a stopgap and will (possibly)
-     be depreceated when (and if) a DBI-event-spec is available.
-     Use it at your own risk.
-
-   o The DBD::Ingres modules now use the DBI template files and are are
-     compliant with the DBI specs as of DBI version 0.90.
-     This implies some changes that may break 'old' DBD::Ingres scripts.
-     + $dbh->rows has been removed
-       This affects the Ingperl variable $sql_rowcount, which is no longer  
-       strictly read-only. I have done my best to ensure that this change
-       will not break ingperl- scripts.
-       DBD-style scripts will have to check that $dbh->rows is not used
-       - or wait for an error at runtime ;-}
-     + newstyle connect has autocommit on, oldstyle (and ingperl) still
-       has autocommit off.
-     + Some $sth attributes have been renamed:
-        SqlLen ->   ing_length
-        SqlType ->  ing_type
-       The old names will be available for an undefined period.
-     + $sth->{TYPE} returns DBI-standard values:
-        int:     SQL_INTEGER
-        float:   SQL_FLOAT
-        money:   SQL_DECIMAL
-        char, varchar, text etc: SQL_CHAR/SQL_VARCHAR
-        date:    SQL_CHAR
-     + $sth->{ing_type} returns what $sth->{TYPE} used to return,
-       ie: 'i', 'f' and 's'. 
-
-   o Test scripts have been moved to the (normal) t/ directory.
-   
 BEFORE BUILDING, TESTING AND INSTALLING this you will need to:
 
     Build, test and install Perl 5.004 (or newer)
@@ -79,7 +29,7 @@ BEFORE BUILDING, TESTING AND INSTALLING this you will need to:
 
     Build, test and install the DBI module.
     It is very important to test it and install it!
-    *** DBI must be at least version 0.90 ***
+    *** DBI must be at least version 0.91 ***
 
 BUILDING
 
@@ -127,13 +77,11 @@ KNOWN PROBLEMS:
             database-name username other-options
           otherwise the check for username wil fail.
 
-        o VMS build fails. I have built with success on VMS after
-          'hacking' the descrip.mms file a bit.
-
 TO DO LIST:
 
         o Add support for OpenIngres long datatypes.
         o Make cursors updateable.
+        o Add a way to call database procedures.
 
 IF YOU HAVE PROBLEMS:
 

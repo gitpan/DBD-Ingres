@@ -1,5 +1,5 @@
 #!/usr/local/bin/perl -sw
-# $Id: Makefile.PL,v 2.106 1997/12/02 07:53:50 ht000 Exp $
+# $Id: Makefile.PL,v 2.107 1997/12/16 08:46:00 ht000 Exp $
 
 require 5.003_93;
 
@@ -71,7 +71,7 @@ if (-f "$II_SYSTEM/ingres/files/abflnk.opt") {
 } elsif (-f "$II_SYSTEM/ingres/lib/libcompat.1.so") {
     $linkwith .= " -lcompat.1";   # OpenIngres without ABF.
 }
-# Adjust linkwith (some 6.4 version have the name of the library in abfopt.opt
+# Adjust linkwith (some 6.4 versions have the name of the library in abfopt.opt
 for ($linkwith) {
    s{(/.*)/lib(.*?)\.a}{-L$1 -l$2};
 }
@@ -91,7 +91,7 @@ $opts{DEFINE} .= '-Xa' if $Config{cc} eq 'clcc';	# CenterLine CC
 warn "WARNING: Your GNU C compiler is very old. Please upgrade.\n"
     if ($Config{gccversion} and $Config{gccversion} =~ m/^(1|2\.[1-5])/);
 
-my $ESQLC = "$II_SYSTEM/ingres/bin/esqlc";
+my $ESQLC = $ENV{ESQLC} ||"$II_SYSTEM/ingres/bin/esqlc";
 
 # OpenVMS has specialities:
 if ($Is_VMS) {
@@ -105,8 +105,8 @@ if ($Is_VMS) {
 } else {
     # Non-vms checks:
     # See if the ESQL-precompiler exists...
-    print "I can't find your Esql/C precompiler\n",
-          "Is your ingres set up correctly??\n"
+    print "I can't find your Esql/C precompiler: '$ESQLC'\n",
+          "Is your Ingres set up correctly??\n"
        unless -x $ESQLC;
 }
 
@@ -126,7 +126,7 @@ if ($Config{osname} eq 'hpux') {
 print "System: perl$] @Config{qw(myuname)}\n",
       "Compiler: @Config{qw(cc optimize ccflags)}\n",
       "SQL-precompiler: $ESQLC\n",
-      "Linking with $linkwith\n" if $Verbose;
+      "Linkwith: '$linkwith'\n" if $Verbose;
 
 print "\n";
 
@@ -188,7 +188,7 @@ dbdimp.c Ingres.h : dbdimp.sc Ingres.sh
 	$(ESQLC) $(ESQLCOPT) dbdimp.sc 
 
 dbdimp.sc: dbdimp.psc
-	$(PERL) -p -e '].$subst.q[' dbdimp.psc > dbdimp.sc
+	$(PERL) -p -e "].$subst.q[" dbdimp.psc > dbdimp.sc
 
 $(BASEEXT).xs: $(BASEEXT).xsi].($Is_VMS ? "\n\tcontinue" : "").q[
 
@@ -197,22 +197,28 @@ $(BASEEXT).c: $(BASEEXT).xsi
 DBI_DRIVER_XST = ].$driver_xst_path.q[
 
 $(BASEEXT).xsi: $(DBI_DRIVER_XST)
-	perl -p -e "s/~DRIVER~/$(BASEEXT)/g" <$(DBI_DRIVER_XST) >$(BASEEXT).xsi
+	$(PERL) -p -e "s/~DRIVER~/$(BASEEXT)/g" <$(DBI_DRIVER_XST) >$(BASEEXT).xsi
 ];
 }
 
 
-{	# If perl Makefile.PL *-g* then switch on debugging
+{   # If perl Makefile.PL *-g* then switch on debugging
     package MY; # SUPER needs package context, $self is not sufficient
     sub const_cccmd {
 	my($self) = shift;
 	local($_) = $self->SUPER::const_cccmd(@_);
-	s/\s-O\d?\b/ -g/g if $::opt_g;
+	return $_ unless $::opt_g;
+	if ($::Is_VMS) {
+	    s!/[Oo][Pp][Tt][Ii]?[a-zA-Z]*!/NOOPTIMIZE/DEBUG!;
+	} else {
+	    s/\s-O\d?\b/ -g/g;
+	}
 	$_;
     }
-    sub dynamic_lib { # This affects only VMS - I hope
+    sub dynamic_lib { # This affects only VMS
 	my ($self) = shift;
 	local($_) = $self->SUPER::dynamic_lib(@_);
+	return $_ unless $::Is_VMS;
 	s!perlshr_attr.opt/Option!perlshr_attr.opt/Option,$linkopt!;
 	$_;
     };

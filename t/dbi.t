@@ -45,7 +45,7 @@ sub connect_db($$) {
 
     print "Testing: DBI->connect('$dbname'):\n"
  	if $verbose;
-    my $dbh = DBI->connect($dbname, "", "", "Ingres", {AutoCommit => 0});
+    my $dbh = DBI->connect($dbname, "", "", {AutoCommit => 0});
     $dbh->{ChopBlanks} = 1;
     if ($dbh) {
         print("1..$num_test\nok 1\n");
@@ -69,8 +69,10 @@ ok(0, $dbh->do("INSERT INTO $testtable VALUES(1, 'Alligator Descartes')"),
 ok(0, $dbh->do("DELETE FROM $testtable WHERE id = 1"),
      "Delete", 1);
 
-ok(0, $cursor = $dbh->prepare("SELECT * FROM $testtable WHERE id = 1"),
+ok(0, $cursor = $dbh->prepare("SELECT * FROM $testtable WHERE id = ?"),
      "prepare(Select)", 1);
+ok(0, $cursor->bind_param(1, 1, {TYPE => SQL_INTEGER}),
+     "Bind param 1 as 1", 1);
 ok(0, $cursor->execute, "Execute(select)", 1);
 $row = $cursor->fetchrow_arrayref;
 ok(0, !defined($row), "Fetch from empty table",
@@ -110,6 +112,15 @@ ok(0, !defined($row = $cursor->fetchrow_arrayref),
      "Row is returned as: ".($row ? DBI->neat_list($row) : "''"));
 ok(0, $cursor->finish, "finish(cursor)", 1);
 
+ok(0, $cursor->execute(2), "Re-execute[select(2)] for chopblanks", 1);
+ok(0, $cursor->{ChopBlanks}, "ChopBlanks on by default", 1);
+$cursor->{ChopBlanks} = 0;
+ok(0, !$cursor->{ChopBlanks}, "ChopBlanks switched off", 1);
+ok(0, $row = $cursor->fetchrow_arrayref, "Fetching row", 1); 
+ok(0, $row->[1] =~ /^Aligator Descartes\s+/, "Column 2 value",
+     "Should be 'Henrik Tougaard   ...  ' is '$row->[1]'");
+ok(0, $cursor->finish, "finish(cursor)", 1);
+
 ok(0, $dbh->do(
         "UPDATE $testtable SET id = 3 WHERE name = 'Alligator Descartes'"),
      "do(Update) one row", 1);
@@ -134,9 +145,8 @@ $dbh and $dbh->commit;
 $dbh and $dbh->disconnect;
 
 # Missing:
-#   test of ChopBlanks etc.
-#           outerjoin and nullability
+#   test of outerjoin and nullability
 #   what else?
 
-BEGIN { $num_test = 32; }
+BEGIN { $num_test = 39; }
 
