@@ -11,7 +11,8 @@ It has been built and tested on
   HP-UX 9 (Ingres 6.4) by Gil Hirsch <gilh@cpm.telrad.co.il>
      (HP-UX 9 needs static linking, the Makefile.PL has been modified to
      handle this).
-
+  HP-UX 10 (also needs static linking)
+  DRS6000 by D.Broughton@it001.sheffield-city.gov.uk. 
 I will with pleasure accept patches and/or recommendations for improvements.
 My workload prevents me from giving this too much time - so have patience....
 

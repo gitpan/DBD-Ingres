@@ -1,5 +1,5 @@
 #
-# $Id: Ingperl.pm,v 1.12 1997/06/16 11:11:57 ht Exp $
+# $Id: Ingperl.pm,v 2.100 1997/09/10 08:00:41 ht000 Exp $
 #
 # Ingperl emulation interface for DBD::Ingres
 #
@@ -17,7 +17,7 @@ use DBI 0.73;
 use Exporter;
 use Carp;
 
-$VERSION = substr(q$Revision: 1.12 $, 10);
+$VERSION = substr(q$Revision: 2.100 $, 10);
 
 @ISA = qw(Exporter);
 
@@ -68,7 +68,7 @@ sub sql_exec {
         # this contain the database name and possibly
         # a username
         # find database
-        ($database) = $statement =~ /connect\s+([\w:]+)/i;
+        ($database) = $statement =~ m!connect\s+([\w:/]+)!i;
         my $rest = $';  #possibly contains username... and other options
         if ($rest =~ /identified\s+by\s+(\w+)/i) {
             $user = $1;
@@ -83,7 +83,7 @@ sub sql_exec {
         warn "Ingperl connecting to database '$database' as user '$user'\n"
             if $sql_debug;
 	$option =~ s/^\s+//;
-        $sql_dbh = $Ingperl::sql_drh->connect($database, $user, $option);
+        $sql_dbh = $Ingperl::sql_drh->connect("$database;$option", $user);
     } else {
         croak "Ingperl: Not connected to database, at" unless $sql_dbh;
 
@@ -143,6 +143,7 @@ sub sql {
             	" previous select, at"
                     if $sql_debug or $sql_sth->{Warn};
             $sql_sth->finish();
+            undef $sql_sth;
         }
         $sql_sth = $sql_dbh->prepare($statement) or return undef;
         $sql_sth->execute() or return undef;
@@ -161,7 +162,7 @@ sub sql {
 #
 
 sub sql_types       { $sql_sth ? @{$sql_sth->{'ing_types'}}   : undef; }
-sub sql_ingtypes    { $sql_sth ? @{$sql_sth->{'ing_sqltypes'}}: undef; }
+sub sql_ingtypes    { $sql_sth ? @{$sql_sth->{'ing_ingtypes'}}: undef; }
 sub sql_lengths     { $sql_sth ? @{$sql_sth->{'ing_lengths'}} : undef; }
 sub sql_nullable    { $sql_sth ? @{$sql_sth->{'NULLABLE'}}    : undef; }
 sub sql_names       { $sql_sth ? @{$sql_sth->{'NAME'}}        : undef; }
@@ -173,8 +174,8 @@ tie $Ingperl::sql_version,   'Ingperl::var', 'version';
 *sql_error = \$DBD::Ingres::errstr;
 *sql_sqlcode = \$DBD::Ingres::err;
 *sql_rowcount = \$DBI::rows;
-$Ingperl::sql_readonly = 1;
-$Ingperl::sql_showerrors = 0;
+tie $Ingperl::sql_readonly,   'Ingperl::var', 'readonly';
+tie $Ingperl::sql_showerrors, 'Ingperl::var', 'showerror';
 
 # *----------------------------------------
 #
@@ -223,8 +224,11 @@ sub FETCH {
         "$Ingperl::sql_drh->{'Attribution'}\n" .
         $sw->{'Attribution'}. ", ".
         "version " . $sw->{'Version'}. "\n\n";
-    }
-    else {
+    } elsif ($$self eq "readonly") {
+    	1;   # Not implemented (yet)
+    } elsif ($$self eq "showerror") {
+    	$Ingperl::sql_dbh->{printerror};
+    } else {
         carp "unknown special variable $$self";
     }
 }
@@ -233,7 +237,11 @@ sub STORE {
     my ($self, $value) = shift;
     confess "wrong type" unless ref $self;
     croak "too many arguments" if @_;
-    carp "Can't modify ${$self} special variable, at"
+    if ($$self eq "showerror") {
+    	$Ingperl::sql_dbh->{printerror} = $value;
+    } else {
+        carp "Can't modify ${$self} special variable, at"
+    }
 }
 
 1;
@@ -315,6 +323,13 @@ B<DBD:> Note that the options B<must> be given in the order
 C<database-name username other-options> otherwise the check for username
 wil fail. It is a rather simple scan of the option-string. Further
 improvements are welcome.
+
+B<DBD:> The connect must be given as "C<connect> I<database-name>
+C<identified by> I<username> I<SQL-options>" or "C<connect>
+I<database-name>C< -u>I<username> I<SQL-options>".
+
+B<DBD:>There is (yet) no way of passing a password to the connect call.
+Suggestion: add "password=I<password>" just after I<username>.
 
 =item disconnect from a database:
 
@@ -563,7 +578,7 @@ Ingperl 2.0.
 If true then ingres error and warning messages are printed by
 ingperl as they happen. Very useful for testing.
 
-B<DBD:> Not yet implemented. (Does anybody need it?)
+B<DBD:> Same as $sql_dbh->{printerror}
 
 =item * $sql_debug (default 0)
 

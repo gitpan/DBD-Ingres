@@ -1,5 +1,5 @@
 /*
- * $Id: dbdimp.sc,v 1.11 1997/06/16 11:11:57 ht Exp $
+ * $Id: dbdimp.sc,v 2.100 1997/09/10 08:00:41 ht000 Exp ht000 $
  *
  * Copyright (c) 1994,1995  Tim Bunce
  *           (c) 1996,1997  Henrik Tougaard
@@ -50,14 +50,16 @@ sql_check(h)
 }
 
 void
-error(h, error_num, text)
+error(h, error_num, text, state)
     SV * h;
     int error_num;
-    char *text;
+    char * text;
+    char * state;
 {
     D_imp_xxh(h);
     sv_setiv(DBIc_ERR(imp_xxh), (IV)error_num);
-    sv_setpv(DBIc_ERRSTR(imp_xxh), (char*)text);
+    sv_setpv(DBIc_ERRSTR(imp_xxh), text);
+    if (state != 0) sv_setpv(DBIc_STATE(imp_xxh), state);
 }
 
 void
@@ -170,23 +172,6 @@ fbh_dump(fbh, i)
             fbh->var->sqltype, fbh->var->sqllen, fbh->var->sqlind);
 }
 
-int
-dbd_rows(h)
-    SV *h;
-{
-    EXEC SQL BEGIN DECLARE SECTION;
-    int rowcount;
-    EXEC SQL END DECLARE SECTION;
-    D_imp_xxh(h);
-    if (dbis->debug >= 2)
-	fprintf(DBILOGFP, "dbd_rows\n");
-    EXEC SQL INQUIRE_INGRES(:rowcount = ROWCOUNT);
-    if (dbis->debug >= 2)
-	fprintf(DBILOGFP, "rowcount = %d\n", rowcount);
-    if (!sql_check(h)) return -1;
-    else return rowcount;
-}
-
 /* ================================================================== */
 
 int
@@ -201,6 +186,7 @@ dbd_db_login(dbh, dbname, user, pass)
     D_imp_dbh(dbh);
     EXEC SQL BEGIN DECLARE SECTION;
     int session;
+    char * opt;
     EXEC SQL END DECLARE SECTION;
 
     if (dbis->debug >= 2)
@@ -208,17 +194,29 @@ dbd_db_login(dbh, dbname, user, pass)
 
     session = imp_dbh->session = nxt_session++;
 
+    opt = dbname;
+    /* look for options in dbname. Syntax: dbname;options */
+    while (*opt && *opt != ';') ++opt;
+    if (*opt == ';') {
+    	*opt = 0; /* terminate dbname */
+    	++opt;    /* point to options */
+    }
+    
     if (user && *user && *user != '/') {
         /* we have a username */
         if (dbis->debug >= 3) fprintf(DBILOGFP, "    user='%s', opt='%s'\n",
-                                user, pass);
-        EXEC SQL CONNECT :dbname SESSION :session
-		 IDENTIFIED BY :user OPTIONS = :pass;
-
+                                user, opt);
+	if (*pass) {
+            EXEC SQL CONNECT :dbname SESSION :session
+		 IDENTIFIED BY :user DBMS_PASSWORD=:pass OPTIONS=:opt;
+	} else {
+            EXEC SQL CONNECT :dbname SESSION :session
+		 IDENTIFIED BY :user OPTIONS=:opt;
+        }
     } else {
         /* just the databasename */
         if (dbis->debug >= 3) fprintf(DBILOGFP, "    nouser\n");
-        EXEC SQL CONNECT :dbname SESSION :session OPTIONS = :pass;
+        EXEC SQL CONNECT :dbname SESSION :session OPTIONS = :opt;
     }
     if (dbis->debug >= 3)
 	fprintf(DBILOGFP, "    After connect, sqlcode=%d, session=%d\n",
@@ -327,7 +325,7 @@ dbd_db_destroy(dbh)
 }
 
 int
-dbd_db_STORE(dbh, keysv, valuesv)
+dbd_db_STORE_attrib(dbh, keysv, valuesv)
     SV *dbh;
     SV *keysv;
     SV *valuesv;
@@ -360,7 +358,7 @@ dbd_db_STORE(dbh, keysv, valuesv)
 }
 
 SV *
-dbd_db_FETCH(dbh, keysv)
+dbd_db_FETCH_attrib(dbh, keysv)
     SV* dbh;
     SV* keysv;
 {
@@ -378,7 +376,7 @@ dbd_db_FETCH(dbh, keysv)
         int autocommit_state;
         EXEC SQL END DECLARE SECTION;
         
-	EXEC SQL SELECT(DBMSINFO("autocommit_state"))
+	EXEC SQL SELECT(DBMSINFO('autocommit_state'))
 	    INTO :autocommit_state;
 	return newSViv((IV)autocommit_state);
     } else {
@@ -395,11 +393,12 @@ dbd_db_FETCH(dbh, keysv)
 /* ================================================================== */
 
 int
-dbd_st_prepare(sth, statement)
+dbd_st_prepare(sth, statement, attribs)
     SV* sth;
     EXEC SQL BEGIN DECLARE SECTION;
     char *statement;
     EXEC SQL END DECLARE SECTION;
+    SV* attribs;   /* unused */
 {
     IISQLDA* sqlda;
     EXEC SQL BEGIN DECLARE SECTION;
@@ -430,12 +429,31 @@ dbd_st_prepare(sth, statement)
         croak("Ingres: Statement returns %d columns, max allowed is %d\n",
                 sqlda->sqld, sqlda->sqln);
     }
-    imp_sth->fbh_num = sqlda->sqld;
-    DBIc_NUM_FIELDS(imp_sth) = imp_sth->fbh_num;
+    DBIc_NUM_FIELDS(imp_sth) = sqlda->sqld;
 
+    /* See if there are any placeholders in the statement */
+    {
+    	char *src = statement;
+    	int in_literal = 0;
+    	int in_string = 0;
+        int in_comment = 0;
+        while(*src) {
+	    if (*src == '"' && !in_string && !in_comment)
+	        in_literal = ~in_literal;
+	    else if (*src == '\'' && !in_literal && !in_comment)
+	        in_string = ~in_string;
+            else if (*src == '/' && src[1] == '*' && !in_literal && !in_string)
+                in_comment = 1;
+            else if (in_comment && *src == '*' && src[1] == '/')
+                in_comment = 0;
+	    if ((*src == '?') && !in_literal && !in_string && !in_comment)
+	    	++DBIc_NUM_PARAMS(imp_sth);
+	    ++src;
+        }
+    }
     if (dbis->debug >= 2)
-        printf("DBD::Ingres::dbd_st_prepare: imp_sth->fbh_num: %d\n",
-                imp_sth->fbh_num);
+        printf("DBD::Ingres::dbd_st_prepare: fields: %d, phs: %d\n",
+                DBIc_NUM_FIELDS(imp_sth), DBIc_NUM_PARAMS(imp_sth));
 
     DBIc_IMPSET_on(imp_sth);
     return 1;
@@ -462,12 +480,15 @@ dbd_describe(h, imp_sth)
     imp_sth->done_desc = 1;
 
     /* describe the statement and allocate bufferspace */
-    Newz(42, imp_sth->fbh, imp_sth->fbh_num + 1, imp_fbh_t);
+    Newz(42, imp_sth->fbh, DBIc_NUM_FIELDS(imp_sth) + 1, imp_fbh_t);
     for (i = 0; i < sqlda->sqld; i++)
     {
         imp_fbh_t *fbh = &imp_sth->fbh[i];
         IISQLVAR *var = fbh->var = &sqlda->sqlvar[i];
-        fbh->nullable = var->sqltype < 0;
+        /* fbh->nullable = var->sqltype < 0;
+        ** Temporary hack for OpenIngres 1.2
+        ** Can't determine nullability for outerjoins */
+        fbh->nullable = 1;
         fbh->origtype = var->sqltype = abs(var->sqltype);
         fbh->origlen = var->sqllen;
         var->sqlname.sqlnamec[var->sqlname.sqlnamel] = 0;
@@ -536,6 +557,87 @@ dbd_describe(h, imp_sth)
 }
 
 int
+dbd_bind_ph (sth, imp_sth, param, value, sql_type, attribs, is_inout, maxlen)
+    SV *sth;
+    imp_sth_t *imp_sth;
+    SV *param;
+    SV *value;
+    IV sql_type;
+    SV *attribs;
+    int is_inout;
+    IV maxlen;
+{
+    int param_no;
+    int type = 0;  /* 1: int, 2: float, 3: string */
+    IISQLVAR* var;
+
+    if (SvNIOK(param) ) {	/* passed as a number	*/
+	param_no = (int)SvIV(param);
+    } else {
+	croak("bind_param: parameter not a number");
+    }
+
+    if (param_no < 1 || param_no > DBIc_NUM_PARAMS(imp_sth))
+    	croak("Ingres(bind_param): parameter outside range 1..%d",
+    		DBIc_NUM_PARAMS(imp_sth));
+
+    if (imp_sth->ph_sqlda.sqld < param_no)
+        imp_sth->ph_sqlda.sqld = param_no;
+
+    var = &imp_sth->ph_sqlda.sqlvar[param_no-1];
+    if (sql_type) {
+    	switch (sql_type) {
+	case SQL_INTEGER:
+	case SQL_SMALLINT:
+	    type = 1; break;
+	case SQL_FLOAT:
+	case SQL_REAL:
+	case SQL_DOUBLE:
+	case SQL_NUMERIC:
+	case SQL_DECIMAL:
+	    type = 2; break;
+	case SQL_CHAR:
+	case SQL_VARCHAR:
+	    type = 3; break;
+	}
+    } else if (!SvOK(value)) { /* NULL */
+	croak("Ingres(bind_param): sorry NULLs not allowed unless TYPE defined");
+    } else if (SvIOK(value)) { /* integer */
+	type = 1;
+    } else if (SvNOK(value)) { /* float */
+        type = 2;
+    } else { /* char */
+        type = 3;
+    }
+    switch (type) {
+    case 1: {/* int */
+    	int* ptr;
+        var->sqlind = 0;
+        var->sqllen = 4;
+        Newz(42, ptr, 1, int);
+	*ptr = (int)SvIV(value);
+        var->sqldata = (char*)ptr;
+        var->sqltype = IISQ_INT_TYPE;
+	break; }
+    case 2: {/* float */
+	double* ptr;
+        var->sqlind = 0;
+        var->sqllen = 8;
+        Newz(42, ptr, 1, double);
+	*ptr = (double)SvNV(value);
+        var->sqldata = (char*)ptr;
+        var->sqltype = IISQ_FLT_TYPE;
+        break; }
+    case 3: {/* string */
+        var->sqlind = 0;
+        var->sqldata = savepv(SvPV(value, na));
+        var->sqllen = strlen(var->sqldata);
+        var->sqltype = IISQ_INT_TYPE;
+        break; }
+    }
+}
+
+int
 dbd_st_execute(sth)	/* <=0 is error, >0 is ok */
     SV *sth;
 {
@@ -545,7 +647,7 @@ dbd_st_execute(sth)	/* <=0 is error, >0 is ok */
     EXEC SQL END DECLARE SECTION;
     
     if (dbis->debug >= 2)
-        fprintf(DBILOGFP,"DBD::Ingres::dbd_st_execute(%s)\n", imp_sth->name);
+        fprintf(DBILOGFP, "DBD::Ingres::dbd_st_execute(%s)\n", imp_sth->name);
 
     if (!imp_sth->done_desc) {
         /* describe and allocate storage for results		*/
@@ -555,20 +657,32 @@ dbd_st_execute(sth)	/* <=0 is error, >0 is ok */
 
     /* Trigger execution of the statement			*/
     set_session(DBIc_PARENT_H(imp_sth));
-    if (imp_sth->fbh_num == 0) {
+    if (DBIc_NUM_FIELDS(imp_sth) == 0) {
         /* non-select statement: just execute it */
         if (dbis->debug >= 2)
-            fprintf(DBILOGFP,"DBD::Ingres::dbd_st_execute - non-select\n");
+            fprintf(DBILOGFP,
+                "DBD::Ingres::dbd_st_execute - non-select, param=%d\n",
+                imp_sth->ph_sqlda.sqld);
 
-        EXEC SQL EXECUTE :name;
+        if (imp_sth->ph_sqlda.sqld > 0) {
+            EXEC SQL EXECUTE :name USING DESCRIPTOR &imp_sth->ph_sqlda;
+        } else {
+            EXEC SQL EXECUTE :name;
+        }
         return sql_check(sth) ? sqlca.sqlerrd[2] : -1;
     } else {
         /* select statement: open a cursor */
         if (dbis->debug >= 2)
-            fprintf(DBILOGFP,"DBD::Ingres::dbd_st_execute - cursor %s\n", name);
+            fprintf(DBILOGFP,
+                "DBD::Ingres::dbd_st_execute - cursor %s - param=%d\n",
+                name, imp_sth->ph_sqlda.sqld);
 
         EXEC SQL DECLARE :name CURSOR FOR :name;
-        EXEC SQL OPEN :name FOR READONLY;
+        if (imp_sth->ph_sqlda.sqld > 0) {
+            EXEC SQL OPEN :name FOR READONLY USING DESCRIPTOR &imp_sth->ph_sqlda;
+        } else {
+            EXEC SQL OPEN :name FOR READONLY;
+        }
         if (!sql_check(sth)) return -1;
         DBIc_ACTIVE_on(imp_sth);
         return 0;
@@ -576,8 +690,8 @@ dbd_st_execute(sth)	/* <=0 is error, >0 is ok */
 }
 
 AV *
-dbd_st_fetchrow(sth)
-    SV *	sth;
+dbd_st_fetch(sth)
+    SV *     sth;
 {
     IISQLDA* sqlda;
     D_imp_sth(sth);
@@ -589,10 +703,10 @@ dbd_st_fetchrow(sth)
     EXEC SQL END DECLARE SECTION;
 
     if (dbis->debug >= 2)
-        fprintf(DBILOGFP,"DBD::Ingres::dbd_st_fetchrow(%s)\n", imp_sth->name);
+        fprintf(DBILOGFP,"DBD::Ingres::dbd_st_fetch(%s)\n", imp_sth->name);
 
     if (!DBIc_ACTIVE(imp_sth)) {
-        error(sth, -7, "fetch without open cursor");
+        error(sth, -7, "fetch without open cursor", 0);
         return Nullav;
     }
     set_session(DBIc_PARENT_H(imp_sth));
@@ -608,7 +722,7 @@ dbd_st_fetchrow(sth)
     num_fields = AvFILL(av)+1;
 
     if (dbis->debug >= 3)
-        fprintf(DBILOGFP, "    dbd_st_fetchrow %d fields\n", num_fields);
+        fprintf(DBILOGFP, "    dbd_st_fetch %d fields\n", num_fields);
 
     for(i=0; i < num_fields; ++i) {
         imp_fbh_t *fbh = &imp_sth->fbh[i];
@@ -637,7 +751,7 @@ dbd_st_fetchrow(sth)
         	SvPVX(fbh->sv)[fbh->len-1] = 0;
         	/* strip trailing blanks */
         	if (fbh->origtype == IISQ_CHA_TYPE
-                 && DBIc_on(imp_sth,DBIcf_ChopBlanks)) {
+                 && DBIc_on(imp_sth, DBIcf_ChopBlanks)) {
         	    for (ch = fbh->len - 2;
         	         SvPVX(fbh->sv)[ch] == ' ';
         	         --ch)
@@ -656,6 +770,24 @@ dbd_st_fetchrow(sth)
     }
     if (dbis->debug >= 3) fprintf(DBILOGFP, "    End fetch\n");
     return av;
+}
+
+int
+dbd_st_rows(sth, imp_sth)
+    SV *sth;
+    imp_sth_t *imp_sth;
+{
+    EXEC SQL BEGIN DECLARE SECTION;
+    int rowcount;
+    EXEC SQL END DECLARE SECTION;
+    if (dbis->debug >= 2)
+	fprintf(DBILOGFP, "dbd_rows\n");
+    set_session(DBIc_PARENT_H(imp_sth));
+    EXEC SQL INQUIRE_INGRES(:rowcount = ROWCOUNT);
+    if (dbis->debug >= 2)
+	fprintf(DBILOGFP, "rowcount = %d\n", rowcount);
+    if (!sql_check(sth)) return -1;
+    else return rowcount;
 }
 
 int
@@ -701,7 +833,7 @@ dbd_st_destroy(sth)
 }
 
 int
-dbd_st_STORE(sth, keysv, valuesv)
+dbd_st_STORE_attrib(sth, keysv, valuesv)
     SV *sth;
     SV *keysv;
     SV *valuesv;
@@ -724,7 +856,7 @@ dbd_st_STORE(sth, keysv, valuesv)
 
 
 SV *
-dbd_st_FETCH(sth, keysv)
+dbd_st_FETCH_attrib(sth, keysv)
     SV *sth;
     SV *keysv;
 {
@@ -752,14 +884,40 @@ dbd_st_FETCH(sth, keysv)
 		SvPV(sth, na), key);
     }
 
-    i = imp_sth->fbh_num;
+    i = DBIc_NUM_FIELDS(imp_sth);
 
-    if (kl==8 && strEQ(key, "ing_type") ||
-        kl==4 && strEQ(key, "TYPE")){
+    if (kl==8 && strEQ(key, "ing_type")){
         AV *av = newAV();
         retsv = newRV((SV*)av);
         while(--i >= 0)
             av_store(av, i, newSVpv(imp_sth->fbh[i].type, 0));
+    } else if (kl==4 && strEQ(key, "TYPE")){
+        AV *av = newAV();
+        retsv = newRV((SV*)av);
+        while(--i >= 0) {
+            int type;
+            switch (imp_sth->fbh[i].origtype) {
+            case IISQ_INT_TYPE:
+		type = SQL_INTEGER;
+		break;
+            case IISQ_MNY_TYPE:
+                type = SQL_DECIMAL;
+                break;
+            case IISQ_FLT_TYPE:
+                type = SQL_FLOAT;
+                break;
+            case IISQ_DTE_TYPE:
+            case IISQ_CHA_TYPE:
+            case IISQ_VCH_TYPE:
+            case IISQ_TXT_TYPE:
+                type = SQL_CHAR;
+                break;
+            default:        /* oh dear! */
+                type = 0;
+                break;
+            }
+            av_store(av, i, newSViv(type));
+        }
     } else if (kl==8 && strEQ(key, "NULLABLE")){
         AV *av = newAV();
         retsv = newRV((SV*)av);
@@ -778,6 +936,7 @@ dbd_st_FETCH(sth, keysv)
         while(--i >= 0)
             av_store(av, i, newSViv((IV)imp_sth->fbh[i].origlen));
     } else if ((kl==9 && strEQ(key, "ing_types")) ||
+               (kl==12 && strEQ(key, "ing_ingtypes")) ||
                (kl==7 && strEQ(key, "SqlType")) ) {
         AV *av = newAV();
         retsv = newRV((SV*)av);

@@ -1,7 +1,7 @@
 #ifndef DBDIMP_H
 #define DBDIMP_H
 /*
-   $Id: Ingres.sh,v 1.6 1997/06/16 11:11:57 ht Exp $
+   $Id: Ingres.sh,v 2.100 1997/09/10 08:00:41 ht000 Exp $
 
    Copyright (c) 1994,1995  Tim Bunce
    Copyright (c) 1996,1997  Henrik Tougaard (ht@datani.dk)
@@ -29,19 +29,17 @@ struct imp_drh_st {
 struct imp_dbh_st {
     dbih_dbc_t com;         /* MUST be first element in structure   */
     int        session;     /* session id for this connection */
-    int        trim_blanks; /* if trailing blanks should be trimmed on selects */
 };
 
 /* Define sth implementor data structure */
 struct imp_sth_st {
     dbih_stc_t com;         /* MUST be first element in structure   */
 
-    IISQLDA sqlda;          /* descriptor for statement (select) */
+    IISQLDA    sqlda;       /* descriptor for statement (select) */
     char      *name;        /* statement name!!! */
     int        st_num;      /* statement number */
     int        done_desc;   /* have we described this sth yet ?	*/
-    int        fbh_num;     /* number of output fields		*/
-    int        trim_blanks; /* if trailing blanks should be trimmed */
+    IISQLDA    ph_sqlda;    /* descriptor for placeholders */
     imp_fbh_t *fbh;	    /* array of imp_fbh_t structs	*/
 };
 
@@ -68,22 +66,25 @@ struct imp_fbh_st { 	    /* field buffer EXPERIMENTAL */
 
 
 void    dbd_init _((dbistate_t *dbistate));
-int	dbd_rows _(());
 int	dbd_db_login _((SV *dbh, char* dbname, char* user, char* pass));
 int	dbd_db_do _((SV *dbh, char *statement, char *attribs, SV *params));
 int	dbd_db_commit _((SV *dbh));
 int	dbd_db_rollback _((SV * dbh));
 int	dbd_db_disconnect _((SV * dbh));
 void	dbd_db_destroy _((SV * dbh));
-int	dbd_db_STORE _((SV *dbh, SV *keysv, SV* valuesv));
-SV*	dbd_db_FETCH _((SV *dbh, SV *keysv));
-int	dbd_st_prepare _((SV * sth, char *statement));
+int	dbd_db_STORE_attrib _((SV *dbh, SV *keysv, SV* valuesv));
+SV*	dbd_db_FETCH_attrib _((SV *dbh, SV *keysv));
+int	dbd_st_prepare _((SV * sth, char *statement, SV* attribs));
 int     dbd_describe _((SV *h, imp_sth_t *imp_sth));
+int     dbd_bind_ph  _((SV *sth, imp_sth_t *imp_sth,
+                SV *param, SV *value, IV sql_type, SV *attribs,
+				int is_inout, IV maxlen));
 int	dbd_st_execute _((SV *sth));
-AV*	dbd_st_fetchrow _((SV *sth));
+AV*	dbd_st_fetch _((SV *sth));
+int	dbd_st_rows _((SV *sth, imp_sth_t *imp_sth));
 int	dbd_st_finish _((SV *sth));
 void	dbd_st_destroy _((SV *sth));
-int	dbd_st_STORE _((SV *dbh, SV *keysv, SV* valuesv));
-SV*	dbd_st_FETCH _((SV *dbh, SV *keysv));
+int	dbd_st_STORE_attrib _((SV *dbh, SV *keysv, SV* valuesv));
+SV*	dbd_st_FETCH_attrib _((SV *dbh, SV *keysv));
 /* end */
 #endif

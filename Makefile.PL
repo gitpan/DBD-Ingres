@@ -1,5 +1,5 @@
 #!/usr/local/bin/perl -sw
-# $Id: Makefile.PL,v 1.12 1997/06/16 11:11:57 ht Exp $
+# $Id: Makefile.PL,v 2.100 1997/09/10 08:00:41 ht000 Exp ht000 $
 
 require 5.003_93;
 
@@ -118,7 +118,7 @@ $opts{depend} = { "dbdimp\$(OBJ_EXT)" => "dbdimp.c Ingres.h",
 		  "Ingres\$(OBJ_EXT)" => "Ingres.h",
                 };
 $opts{clean} = { FILES => "dbdimp.c Ingres.h" };
-$opts{macro} = { ESQLC => "esqlc", ESQLCOPT => "-o.h" };
+$opts{macro} = { ESQLC => "$II/ingres/bin/esqlc", ESQLCOPT => "-o.h" };
 
 WriteMakefile(%opts);
 

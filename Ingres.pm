@@ -1,4 +1,4 @@
-#   $Id: Ingres.pm,v 1.17 1997/06/20 05:55:24 ht Exp $
+#   $Id: Ingres.pm,v 2.101 1997/09/10 08:03:02 ht000 Exp ht000 $
 #
 #   Copyright (c) 1994,1995 Tim Bunce
 #             (c) 1996 Henrik Tougaard
@@ -34,8 +34,8 @@ DBD::Ingres - Ingres access interface for Perl5
     use DynaLoader ();
     @ISA = qw(DynaLoader);
 
-    $VERSION = '0.0504';
-    my $Revision = substr(q$Revision: 1.17 $, 10);
+    $VERSION = '0.05_90';
+    my $Revision = substr(q$Revision: 2.101 $, 10);
 
     require_version DBI 0.82;
 
@@ -71,10 +71,6 @@ DBD::Ingres - Ingres access interface for Perl5
 {   package DBD::Ingres::dr; # ====== DRIVER ======
     use strict;
 
-    sub errstr {
-        DBD::Ingres::errstr(@_);
-    }
-
     sub connect {
         my($drh, $dbname, $user, $auth)= @_;
 
@@ -103,14 +99,6 @@ DBD::Ingres - Ingres access interface for Perl5
 {   package DBD::Ingres::db; # ====== DATABASE ======
     use strict;
 
-    sub errstr {
-        DBD::Ingres::errstr(@_);
-    }
-
-    sub  rows {
-        DBD::Ingres::rows(@_);
-    }
-    
     sub do {
         my($dbh, $statement, $attribs, @params) = @_;
         Carp::carp "\$dbh->do() attribs unused\n" if $attribs;
@@ -123,7 +111,7 @@ DBD::Ingres - Ingres access interface for Perl5
 
         # create a 'blank' sth
         my $sth = DBI::_new_sth($dbh, {
-            'Statement' => $statement,
+            'ing_statement' => $statement,
             });
 
         DBD::Ingres::st::_prepare($sth, $statement, @attribs)
@@ -138,13 +126,6 @@ DBD::Ingres - Ingres access interface for Perl5
 {   package DBD::Ingres::st; # ====== STATEMENT ======
     use strict;
 
-    sub errstr {
-        DBD::Ingres::errstr(@_);
-    }
-
-    sub rows {
-        DBD::Ingres::rows(@_);
-    }
 }
 
 1;
@@ -161,15 +142,6 @@ DBD::Ingres.
 =head2 Not implemented
 
 =over 4
-
-=item Binding
-
-Parameter binding is not implented is this version of DBD::Ingres. It is
-planned for a future release - but does not have high priority. Any
-takers?
-
-As there is no binding, there is no need for reexecution of statements -
-not that anything in the code prevents it - to my knowledge :-)
 
 =item state
 
@@ -198,23 +170,39 @@ Support will be added when the need arises - if you need it you add it ;-)
 
 =over 4
 
-=item AutoCommit
+=item connect
 
-    $dbh-E<gt>{AutoCommit}       ($)
+    connect(dbi:Ingres:dbname[;options] [, user [, password]])
 
-Defaults to B<OFF>. The DBI spec specifies that it should be ON, but the
-default mode for other Ingres tools is AutoCommit OFF and that should be
-followed here.
+Options to the connection are passed in the datasource
+argument. This argument should contain the database name possibly
+followed by a semicolon and the database options.
 
-Any objections?
+Options must be given exactly as they would be given an ESQL-connect
+statement, ie. separated by blanks.
 
-=item ChopBlanks
+The connect call will result in a connect statement like:
 
-    $h->{ChopBlanks}             ($)
+    CONNECT dbname IDENTIFIED BY user PASSWORD password OPTIONS=options
 
-Defaults to !$h-E<gt>{CompatMode} (true normally, false for Ingperl
-emulation) - again not quite according to the DBI-spec, but doing the
-"right" thing for Ingres.
+Eg.
+
+=over 4
+
+=item local database
+
+       connect("mydb", "me", "mypassword")
+
+=item with options and no password
+
+       connect("mydb;-Rmyrole/myrolepassword", "me")
+
+=item Ingres/Net database
+
+       connect("thatnode::thisdb;-xw -l", "him", "hispassword")
+=back
+
+and so on.
 
 =item do
 
@@ -223,11 +211,11 @@ emulation) - again not quite according to the DBI-spec, but doing the
 This is implemented as a call to 'EXECUTE IMMEDIATE' with all the
 limitations that this implies.
 
-This may change when binds are added.
+Placeholders and binding is not supported with C<$dbh-E<gt>do>.
 
-=item statement
+=item ing_statement
 
-    $sth->{statement}             ($)
+    $sth->{ing_statement}             ($)
 
 Contains the text of the SQL-statement. Used mainly for debugging.
 

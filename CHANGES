@@ -1,3 +1,15 @@
+v0.05_90  1997.09.10
+    Major rehaul
+    - added bind params - NOTE It doesn't work yet
+    - added password support
+    - HPUX must link statically
+    - RCS Revision bumped to 2.100 so CPAN can find its way around
+    - tried to adjust to the DBI-spec (as pr. DBI-0.90) with all Tim's new
+      ideas
+    - expanded pod
+    This is released as a "release early and often" version - respects to Eric
+    S. Raymond - for the not faint at heart.
+
 V0.0504   1997.06.16
     Dropped { ing_trim_blanks } again as Tim Bunce has added it to DBI.
     Now needs  DBI-0.82. (for this reason)
