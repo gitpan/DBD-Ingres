@@ -15,6 +15,14 @@ As of now (1999.05.25) the advice is to use Perl5.005_02.
    License or the Artistic License, as specified in the Perl README file.
 
 New features:
+v0.20       1999.09.01
+  This has been running without problems on several machines here for some
+  months now. Time to release it and see what (if anything) breaks.
+  Still to be done:
+  - linking on VMS (waiting for DBI to link w.o. problems on VMS).
+  - compiling without tweeking on NT (ran out of tuits).
+  - tracking the latest chenges in the DBI spec (meta data and cached          
+    statements to name the most obvious).
 
 V0.19_3     1999.05.25
   - Cleanup of the code. Removal of some/all (?!!) of the core dumps.
@@ -153,10 +161,20 @@ dlopen: Unresolved symbols at
           GNU-ld on SunOS. The problems disappeared when he reverted to
           Sun's ld. Message was: "ld.so: Undefined symbol: _IIGCa_static"
 
+        o A message somewhat like:
+            install_driver(Ingres) failed: Can't load '....DBD/Ingres/Ingres.so'
+            for module DBD::Ingres: dlopen: cannot load ....
+          usually indicates that the shared Ingres library is not in the
+          path for shraed libraries given in LD_LIBRARY_PATH
+
 TO DO LIST:
 
         o Add support for OpenIngres long datatypes.
         o Add a way to call database procedures.
+        o Add cached statements
+        o Track the changes in the DBI spec
+        o Verify that DBD::Ingres work under Apache::DBI (and make neccesary
+          changes)
 
 IF YOU HAVE PROBLEMS:
 
@@ -189,7 +207,7 @@ Please include:
 5. Please don't post problems to comp.lang.perl.misc or perl5-porters.
 
 6. If you are not currently subscribed to the mailing list please
-   subscribe via http://www.fugue.com/dbi
+   subscribe via http://www.isc.org/dbi-lists.html
 
 Regards,
 Tim, Al & Henrik.

@@ -1,4 +1,4 @@
-#   $Id: Ingres.pm,v 2.116 1999/05/25 09:53:07 ht000 Exp $
+#   $Id: Ingres.pm,v 2.117 1999/09/01 07:13:06 ht000 Exp $
 #
 #   Copyright (c) 1994,1995 Tim Bunce
 #             (c) 1996 Henrik Tougaard
@@ -34,8 +34,8 @@ DBD::Ingres - DBI driver for Ingres database systems
     use DynaLoader ();
     @ISA = qw(DynaLoader);
 
-    $VERSION = '0.19_3';
-    my $Revision = substr(q$Revision: 2.116 $, 10);
+    $VERSION = '0.20';
+    my $Revision = substr(q$Revision: 2.117 $, 10);
 
     bootstrap DBD::Ingres $VERSION;
 

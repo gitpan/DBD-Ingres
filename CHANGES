@@ -1,3 +1,12 @@
+v0.20       1999.09.01
+  This has been running without problems on several machines here for some
+  months now. Time to release it and see what (if anything) breaks.
+  Still to be done:
+  - linking on VMS (waiting for DBI to link w.o. problems on VMS).
+  - compiling without tweeking on NT (ran out of tuits).
+  - tracking the latest chenges in the DBI spec (meta data and cached
+    statements to name the most obvious).
+ 
 V0.19_3     1999.05.25
   - Cleanup of the code. Removal of some/all (?!!) of the core dumps.
     No longer 'unaligned access'.
