@@ -1,5 +1,5 @@
 #!/usr/local/bin/perl -sw
-# $Id: //depot/tilpasninger/dbd-ingres/Makefile.PL#4 $
+# $Id: //depot/tilpasninger/dbd-ingres/Makefile.PL#6 $
 
 require 5.004;
 

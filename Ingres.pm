@@ -1,4 +1,4 @@
-# $Id: //depot/tilpasninger/dbd-ingres/Ingres.pm#14 $ $DateTime: 2003/07/03 17:04:55 $ $Revision: #14 $
+# $Id: //depot/tilpasninger/dbd-ingres/Ingres.pm#17 $ $DateTime: 2004/01/12 12:10:18 $ $Revision: #17 $
 #
 #   Copyright (c) 1996-2000 Henrik Tougaard
 #
@@ -34,8 +34,8 @@ DBD::Ingres - DBI driver for Ingres database systems
     use DynaLoader ();
     @ISA = qw(DynaLoader);
 
-    $VERSION = '0.50';
-    my $Revision = substr(q$Change: 14429 $, 8)/100;
+    $VERSION = '0.51';
+    my $Revision = substr(q$Change: 18308 $, 8)/100;
 
     bootstrap DBD::Ingres $VERSION;
 
@@ -88,7 +88,7 @@ DBD::Ingres - DBI driver for Ingres database systems
 
         $user = "" unless defined $user;
         $auth = "" unless defined $auth;
-        
+
         # Connect to the database..
         DBD::Ingres::db::_login($this, $dbname, $user, $auth)
             or return undef;
@@ -128,7 +128,7 @@ DBD::Ingres - DBI driver for Ingres database systems
         my $sth = DBI::_new_sth($dbh, {
             Statement => $statement,
             ing_statement => $statement,
-	    ing_readonly  => $ing_readonly, 
+	    ing_readonly  => $ing_readonly,
             });
 
         DBD::Ingres::st::_prepare($sth, $statement, $attribs)
@@ -141,7 +141,7 @@ DBD::Ingres - DBI driver for Ingres database systems
         my ($dbh) = @_;
         my $sth = $dbh->prepare("
 	  SELECT VARCHAR(null) AS TABLE_CAT, table_owner AS TABLE_SCHEM,	                 table_name, 'TABLE' AS TABLE_TYPE
-	  FROM IITABLES                      
+	  FROM IITABLES
 	  WHERE table_type='T'
           UNION
           SELECT null, table_owner, table_name, 'VIEW'
@@ -460,6 +460,16 @@ attribute.
 
 B<NOTE> DBD::Ingres version later than 0.19_1 have opened all cursors for
 update. This change breaks that behaviour. Sorry if this breaks your code.
+
+=head2 ing_rollback
+
+The DBI docs state that 'Changing C<AutoCommit> from off to on will
+trigger a C<commit>'.
+
+Setting ing_rollback to B<on> will change that to 'Changing C<AutoCommit>
+from off to on will trigger a C<rollback>'.
+
+Default value is B<off>.
 
 =head2 ing_statement
 

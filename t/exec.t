@@ -92,8 +92,25 @@ ok(0, $sth->bind_param(1,2,SQL_INTEGER), "bind 3-1");
 ok(0, $sth->bind_param(2,'abc',SQL_CHAR), "bind 3-2");
 ok(0, $sth->execute(), "execute 3");
 
-ok(0, $dbh->do( "DROP TABLE $testtable" ), "Dropping table", 1);
-ok(0, $dbh->rollback(), "rollback()", 1);
-ok(0, $dbh->disconnect(), 1);
+# Now check that AutoCommit handling is OK
+# AutoCommit is 0:
+ok(0, $dbh->{AutoCommit} == 0, "AutoCommit should be 0", ",
+  is :".$dbh->{AutoCommit});
+ok(0, $dbh->{AutoCommit} = 1, "Set AutoCommit to 1", 1);
+#Check that the data from "bind 1" is there
+ok(0, $dbh->do("UPDATE $testtable SET col1=4 WHERE col1=1")==1,
+	"Updating row (1,'abc')", 1);
+ok(0, ($dbh->{AutoCommit} = 0)  == 0, "Set AutoCommit to 0", 1);
+#Change the row back again
+ok(0, $dbh->do("UPDATE $testtable SET col1=1 WHERE col1=4")==1,
+	"Updating row (4,'abc')", 1);
+# And set rollback-mode
+ok(0, $dbh->{ing_rollback}=1, "Ing_rollback set to 1", 1);
+ok(0, $dbh->{AutoCommit} = 1, "Set AutoCommit to 1", 1);
+ok(0, $dbh->do("UPDATE $testtable SET col1=1 WHERE col1=4")==1,
+	"Updating row (4,'abc') after rollback", 1);
 
-BEGIN { $num_test = 15; }
+ok(0, $dbh->do( "DROP TABLE $testtable" ), "Dropping table", 1);
+ok(0, $dbh->disconnect(), "disconnect", 1);
+
+BEGIN { $num_test = 22; }

@@ -1,5 +1,5 @@
 /*                               -*- Mode: C -*- 
- * $Id: //depot/tilpasninger/dbd-ingres/dbdimp.psc#11 $
+ * $Id: //depot/tilpasninger/dbd-ingres/dbdimp.psc#13 $
  *
  * Copyright (c) 1994,1995  Tim Bunce
  *           (c) 1996,1997  Henrik Tougaard
@@ -325,6 +325,9 @@ dbd_db_login(dbh, imp_dbh, dbname, user, pass)
     /* Set default value for LongReadLen */
     DBIc_LongReadLen(imp_dbh) = 2UL * 1024 * 1024 * 1024;
 
+
+    /* Set default value for ing_rollback */
+    imp_dbh->ing_rollback = 0;
     return 1;
 }
 
@@ -471,11 +474,11 @@ dbd_db_disconnect(dbh, imp_dbh)
     EXEC SQL INQUIRE_INGRES(:transaction_active = TRANSACTION);
     if (transaction_active == 1){
         warn("DBD::Ingres: You should commit or rollback before disconnect.");
-        warn("DBD::Ingres: Any outstanding changes have been rolledback.");
         EXEC SQL ROLLBACK;
         if (sqlca.sqlcode != 0) {
-            warn("DBD::Ingres: problem rolling back");
+            warn("DBD::Ingres: problem rolling back: SQLCODE: %d", sqlca.sqlcode);
         }
+        warn("DBD::Ingres: Any outstanding changes have been rolledback.");
     }
     EXEC SQL DISCONNECT;
     /* We assume that disconnect will always work       */
@@ -526,15 +529,25 @@ dbd_db_STORE_attrib(dbh, imp_dbh, keysv, valuesv)
 		      "DBD::Ingres::dbd_db_STORE(AUTOCOMMIT=%d, TRANSACTION=%d)sqlca=%d\n",
 		      autocommit_state, transaction_state, sqlca.sqlcode);
       if (transaction_state == 0 || on && transaction_state != 0) {
-	/* commit if
+	/* commit/rollback if
 	   a) there was no outstanding transaction (clears the way for
 	      SET AUTOCOMMIT ...)
 	   b) there was an outstanding transaction and autocommit is set to on
 	   (defined in the DBI specs). */
-	EXEC SQL COMMIT;
+	if (dbis->debug >= 3)
+	  PerlIO_printf(DBILOGFP,"DBD::Ingres::dbd_db_STORE(AUTOCOMMIT): ");
+	if (imp_dbh->ing_rollback) {
+	  if (dbis->debug >= 3)
+	    PerlIO_printf(DBILOGFP,"ROLLBACK\n");
+	  EXEC SQL ROLLBACK;
+	} else {
+	  if (dbis->debug >= 3)
+	    PerlIO_printf(DBILOGFP,"COMMIT\n");
+	  EXEC SQL COMMIT;
+	}
       }
       if (dbis->debug >= 3)
-	PerlIO_printf(DBILOGFP,"DBD::Ingres::dbd_db_STORE(AUTOCOMMIT=");
+	PerlIO_printf(DBILOGFP,"DBD::Ingres::dbd_db_STORE(AUTOCOMMIT): ");
       if (on && autocommit_state == 0) {
 	/* switch from off to on */
 	EXEC SQL SET AUTOCOMMIT ON;
@@ -549,6 +562,8 @@ dbd_db_STORE_attrib(dbh, imp_dbh, keysv, valuesv)
 	sql_check(dbh);
       } /* else keep state as it is */
       DBIc_set(imp_dbh, DBIcf_AutoCommit, on);
+    } else if (kl==12 && strEQ(key, "ing_rollback")) {
+      imp_dbh->ing_rollback = on;
     } else {
       return FALSE;
     }
@@ -590,6 +605,8 @@ dbd_db_FETCH_attrib(dbh, imp_dbh, keysv)
       if (transaction_state == 0) {
 	EXEC SQL COMMIT;
       }
+    } else if (kl==12 && strEQ(key, "ing_rollback")) {
+      retsv = imp_dbh->ing_rollback ? &sv_yes : &sv_no;
     }
 
     if (!retsv)

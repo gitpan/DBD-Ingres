@@ -14,3 +14,4 @@ t/exec.t
 README
 CHANGES
 
+META.yml                                 Module meta-data (added by MakeMaker)

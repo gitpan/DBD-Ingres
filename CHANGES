@@ -1,4 +1,11 @@
-$Id: //depot/tilpasninger/dbd-ingres/CHANGES#15 $ $DateTime: 2003/07/03 17:04:55 $ $Author: ht000 $
+$Id: //depot/tilpasninger/dbd-ingres/CHANGES#18 $ $DateTime: 2004/01/12 12:10:18 $ $Author: ht000 $
+v0.51     2004.01.12
+ Added an errorcheck on the rollback when disconnecting with open transaction.
+ Corrected spelling of $dbh->{PrintError} in Ingperl.pm
+ Added AutoCommit=>0 to connect call.
+ Added ing_rollback to change the behaviour of setting AutoCommit=>1 with
+  an open transaction. The DBI docs state that the transaction is commited,
+  with $dbh->{ing_rollback}=1 the transaction is rolled back instead.
 v0.50     2003.09.15
  All changes due to Mike Battersby <mib@unimelb.edu.au>
  - add missing long datatype info into the attribute fetching.

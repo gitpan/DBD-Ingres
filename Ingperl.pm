@@ -1,4 +1,4 @@
-# $Id: //depot/tilpasninger/dbd-ingres/Ingperl.pm#3 $ $DateTime: 2002/05/13 18:52:39 $ $Revision: #3 $
+# $Id: //depot/tilpasninger/dbd-ingres/Ingperl.pm#4 $ $DateTime: 2004/01/12 12:10:18 $ $Revision: #4 $
 #
 # Ingperl emulation interface for DBD::Ingres
 #
@@ -16,7 +16,7 @@ use DBI 0.73;
 use Exporter;
 use Carp;
 
-$VERSION = 3.0+substr(q$Revision: #3 $, 11)/100;
+$VERSION = 3.0+substr(q$Revision: #4 $, 11)/100;
 
 @ISA = qw(Exporter);
 
@@ -84,7 +84,8 @@ sub sql_exec {
         warn "Ingperl connecting to database '$database' as user '$user'\n"
             if $sql_debug;
 	$option =~ s/^\s+//;
-        $sql_dbh = $Ingperl::sql_drh->connect("$database;$option", $user);
+        $sql_dbh = $Ingperl::sql_drh->connect("$database;$option", $user,
+					     {AutoCommit=>0});
     } else {
         croak "Ingperl: Not connected to database, at" unless $sql_dbh;
 
@@ -231,7 +232,7 @@ sub FETCH {
     } elsif ($$self eq "readonly") {
     	1;   # Not implemented (yet)
     } elsif ($$self eq "showerror") {
-    	$Ingperl::sql_dbh->{printerror} if defined $Ingperl::sql_dbh;
+    	$Ingperl::sql_dbh->{PrintError} if defined $Ingperl::sql_dbh;
     } else {
         carp "unknown special variable $$self";
     }
@@ -243,7 +244,7 @@ sub STORE {
     confess "wrong type" unless ref $self;
     croak "too many arguments" if @_;
     if ($$self eq "showerror") {
-    	$Ingperl::sql_dbh->{printerror} = $value;
+    	$Ingperl::sql_dbh->{PrintError} = $value;
     } else {
         carp "Can't modify ${$self} special variable, at"
     }
@@ -583,7 +584,7 @@ Ingperl 2.0.
 If true then ingres error and warning messages are printed by
 ingperl as they happen. Very useful for testing.
 
-B<DBD:> Same as $sql_dbh->{printerror}
+B<DBD:> Same as $sql_dbh->{PrintError}
 
 =item * $sql_debug (default 0)
 

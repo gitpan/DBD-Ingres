@@ -1,7 +1,7 @@
 #ifndef DBDIMP_H
 #define DBDIMP_H
 /*
-   $Id: //depot/tilpasninger/dbd-ingres/Ingres.sh#2 $
+   $Id: //depot/tilpasninger/dbd-ingres/Ingres.sh#4 $
 
    Copyright (c) 1994,1995  Tim Bunce
    Copyright (c) 1996,1997  Henrik Tougaard (htoug@cpan.org)
@@ -40,6 +40,7 @@ struct imp_dbh_st {
     int        trans_no;    /* transaction sequence number, is
                             ** incremented by 1 at every commit/
                             ** rollback */
+    int       ing_rollback; /* Rollsback on change of autocommit */
 };
 
 /* Define sth implementor data structure */
