@@ -1,5 +1,13 @@
-$Id: //depot/tilpasninger/dbd-ingres/CHANGES#11 $ $DateTime: 2002/05/18 13:25:33 $ $Author: ht000 $
-
+$Id: //depot/tilpasninger/dbd-ingres/CHANGES#13 $ $DateTime: 2002/11/22 11:11:32 $ $Author: ht000 $
+v0.36       2002.11.22
+ -bind_param didn't accept type SQL_DATE. I should have been a stringish
+  type. Pointed out by Mark Buckle <mark.buckle@intechsolutions.co.uk>
+v0.35       2002.05.31
+ -The test in dbi.t on column name must be case insensitive. Pointed
+  out by Lenio Eric <elenio@mct.rochester.edu>.
+ -Further refinements in the AutoCommit area: failed when setting
+  $dbh->{AutoCommit} to 1 when it already was 1. Pointed out by
+  Preben Sørensen <pso001@foa.dk>. Perhaps someday I'll get it right :-P
 v0.34       2002.05.18
  -Setting $dbh->{AutoCommit}=1 trigers a commit as per the DBI specs.
 v0.33       2002.05.13

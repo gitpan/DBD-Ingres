@@ -59,24 +59,17 @@ know so that I can try to make it automatic in a later release.
 
 New features (See the CHANGES file for a complete list):
 
+v0.36       2002.11.22
+ -bind_param didn't accept type SQL_DATE. I should have been a stringish
+  type. Pointed out by Mark Buckle <mark.buckle@intechsolutions.co.uk>
+v0.35       2002.05.31
+ -The test in dbi.t on column name must be case insensitive. Pointed
+  out by Lenio Eric <elenio@mct.rochester.edu>.
+ -Further refinements in the AutoCommit area: failed when setting
+  $dbh->{AutoCommit} to 1 when it already was 1. Pointed out by
+  Preben Sørensen <pso001@foa.dk>. Perhaps someday I'll get it right :-P
 v0.34       2002.05.18
  -Setting $dbh->{AutoCommit}=1 trigers a commit as per the DBI specs.
-v0.33       2002.05.13
- -Bug in AutoCommit handling fixed. Previously Setting AutoCommit caused
-  a $dbh->Commit to be executed causing all kinds of grief. Eg setting
-  AutoCommit to  in the middle of a transaction triggered an absolutely
-  unwanted commit.
-v0.32       2002.03.06
- -Changes for perl5.7.3: all fprintf calls replaces by PerlIO_printf.
- -Bug in $sth->execute fixed. Sometimes errors were not detected.
-  Thanks to Dirk Kraemer <kraemer@rz.uni-kiel.de>.
- -Fixed Ingperl versionnumber so that CPAN is happier.
-
-v0.31       2001.09.17
- -To aid errorhandling dbh->{Statement} will contain the text of the SQL
-  statement being executed during $dbh->do calls. This is an extension to
-  the normal DBI spec due to the special handling of $dbh->do in DBD::Ingres.
- -Minor improvents in the tests.
 
 KNOWN PROBLEMS:
 

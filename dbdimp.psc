@@ -1,5 +1,5 @@
 /*                               -*- Mode: C -*- 
- * $Id: //depot/tilpasninger/dbd-ingres/dbdimp.psc#8 $
+ * $Id: //depot/tilpasninger/dbd-ingres/dbdimp.psc#10 $
  *
  * Copyright (c) 1994,1995  Tim Bunce
  *           (c) 1996,1997  Henrik Tougaard
@@ -512,30 +512,38 @@ dbd_db_STORE_attrib(dbh, imp_dbh, keysv, valuesv)
     set_session(dbh);
     if (kl==10 && strEQ(key, "AutoCommit")){
       EXEC SQL BEGIN DECLARE SECTION;
-      int transaction_state;
+      int transaction_state, autocommit_state;
       EXEC SQL END DECLARE SECTION;
-      EXEC SQL SELECT INT4(DBMSINFO('TRANSACTION_STATE'))
-	INTO :transaction_state;
+      EXEC SQL SELECT INT4(DBMSINFO('AUTOCOMMIT_STATE')),
+	INT4(DBMSINFO('TRANSACTION_STATE'))
+	INTO :autocommit_state, :transaction_state;
       if (dbis->debug >= 3)
 	PerlIO_printf(DBILOGFP,
-		      "DBD::Ingres::dbd_db_FETCH(TRANSACTION=%d)sqlca=%d\n",
-		      transaction_state, sqlca.sqlcode);
-      if (transaction_state == 0 || on) {
+		      "DBD::Ingres::dbd_db_STORE(AUTOCOMMIT=%d, TRANSACTION=%d)sqlca=%d\n",
+		      autocommit_state, transaction_state, sqlca.sqlcode);
+      if (transaction_state == 0 || on && transaction_state != 0) {
+	/* commit if
+	   a) there was no outstanding transaction (clears the way for
+	      SET AUTOCOMMIT ...)
+	   b) there was an outstanding transaction and autocommit is set to on
+	   (defined in the DBI specs). */
 	EXEC SQL COMMIT;
       }
       if (dbis->debug >= 3)
 	PerlIO_printf(DBILOGFP,"DBD::Ingres::dbd_db_STORE(AUTOCOMMIT=");
-      if (on) {
+      if (on && autocommit_state == 0) {
+	/* switch from off to on */
 	EXEC SQL SET AUTOCOMMIT ON;
 	if (dbis->debug >= 3)
 	  PerlIO_printf(DBILOGFP,"ON), sqlcode=%d\n", sqlca.sqlcode);
 	sql_check(dbh);
-      } else {
+      } else if (!on && autocommit_state != 0) {
+	/* switch from on to off */
 	EXEC SQL SET AUTOCOMMIT OFF;
 	if (dbis->debug >= 3)
 	  PerlIO_printf(DBILOGFP,"OFF), sqlcode=%d\n", sqlca.sqlcode);
 	sql_check(dbh);
-      }
+      } /* else keep state as it is */
       DBIc_set(imp_dbh, DBIcf_AutoCommit, on);
     } else {
       return FALSE;
@@ -872,6 +880,7 @@ dbd_bind_ph (sth, imp_sth, param, value, sql_type, attribs, is_inout, maxlen)
             type = 2; break;
         case SQL_CHAR:
         case SQL_VARCHAR:
+	case SQL_DATE:
             type = 3; break;
 	default:
 	    croak("DBD::Ingres::bind_param: Unknown TYPE: %d, param_no %d",

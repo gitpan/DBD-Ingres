@@ -83,7 +83,7 @@ ok(0, !defined($row), "Fetch from empty table",
      "Row is returned as: ".($row ? DBI->neat_list($row) : "''"));
 ok(0, $cursor->finish, "Finish(select)", 1);
 
-ok(0, $cursor->{NAME}[0] eq "id", "Column 1 name",
+ok(0, lc($cursor->{NAME}[0]) eq "id", "Column 1 name",
      "should be 'id' is '$cursor->{NAME}[0]'");
 my $null = join  ':', map int($_), @{$cursor->{NULLABLE}};
 ok(0, $null eq '0:1',
