@@ -1,4 +1,4 @@
-# $Id: //depot/tilpasninger/dbd-ingres/Ingres.pm#4 $ $DateTime: 2001/02/12 19:51:44 $ $Revision: #4 $
+# $Id: //depot/tilpasninger/dbd-ingres/Ingres.pm#6 $ $DateTime: 2001/04/03 14:23:26 $ $Revision: #6 $
 #
 #   Copyright (c) 1996-2000 Henrik Tougaard
 #
@@ -34,8 +34,8 @@ DBD::Ingres - DBI driver for Ingres database systems
     use DynaLoader ();
     @ISA = qw(DynaLoader);
 
-    $VERSION = '0.29';
-    my $Revision = substr(q$Change: 1904 $, 8)/100;
+    $VERSION = '0.30';
+    my $Revision = substr(q$Change: 2236 $, 8)/100;
 
     bootstrap DBD::Ingres $VERSION;
 

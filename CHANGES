@@ -1,4 +1,11 @@
-$Id: //depot/tilpasninger/dbd-ingres/CHANGES#6 $ $DateTime: 2001/03/02 14:15:40 $ $Author: ht000 $
+$Id: //depot/tilpasninger/dbd-ingres/CHANGES#8 $ $DateTime: 2001/04/03 14:23:26 $ $Author: ht000 $
+
+v0.30       2001.04.03
+  Version 0.29 withdrawn. The changes cause too many problems
+  with "normal" VARCHAR types. The testsuite didn't catch the bugs
+  VARCHARS with embedded NULL characters will have to wait for Ingres6.4
+  support in DBD::Ingres to die out (or for some more tuits).
+  Sorry.
 
 v0.29       2001.03.20
   Fetch of binary data (ie CHAR or VARCHAR containing '\0' chars) didn't

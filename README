@@ -58,6 +58,10 @@ You should never need to make any changes. If you do *please* let me
 know so that I can try to make it automatic in a later release.
 
 New features (See the CHANGES file for a complete list):
+v0.30       2001.04.03
+  Withdrawal of version 0.29 - causes bugs with "normal" VARCHAR fields
+  - will have to think a while.
+
 v0.29       2001.03.20
   Fetch of binary data (ie CHAR or VARCHAR containing '\0' chars) didn't
   work. The fields were truncated at the \0-char. Pointed out by               
