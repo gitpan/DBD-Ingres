@@ -1,7 +1,7 @@
 #ifndef DBDIMP_H
 #define DBDIMP_H
 /*
-   $Id: Ingres.sh,v 2.100 1997/09/10 08:00:41 ht000 Exp $
+   $Id: Ingres.sh,v 2.101 1997/09/12 06:26:47 ht000 Exp $
 
    Copyright (c) 1994,1995  Tim Bunce
    Copyright (c) 1996,1997  Henrik Tougaard (ht@datani.dk)
@@ -68,6 +68,7 @@ struct imp_fbh_st { 	    /* field buffer EXPERIMENTAL */
 void    dbd_init _((dbistate_t *dbistate));
 int	dbd_db_login _((SV *dbh, char* dbname, char* user, char* pass));
 int	dbd_db_do _((SV *dbh, char *statement, char *attribs, SV *params));
+int	dbd_db_rows _((SV *dbh, imp_dbh_t *imp_dbh));
 int	dbd_db_commit _((SV *dbh));
 int	dbd_db_rollback _((SV * dbh));
 int	dbd_db_disconnect _((SV * dbh));

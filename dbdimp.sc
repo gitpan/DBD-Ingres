@@ -1,5 +1,5 @@
 /*
- * $Id: dbdimp.sc,v 2.101 1997/09/11 07:42:45 ht000 Exp $
+ * $Id: dbdimp.sc,v 2.102 1997/09/12 06:26:47 ht000 Exp $
  *
  * Copyright (c) 1994,1995  Tim Bunce
  *           (c) 1996,1997  Henrik Tougaard
@@ -99,10 +99,10 @@ error(h, error_num, text, state)
 }
 
 void
-set_session(h)
-    SV * h;
+set_session(dbh)
+    SV * dbh;
 {
-    D_imp_dbh(h);
+    D_imp_dbh(dbh);
     EXEC SQL BEGIN DECLARE SECTION;
     int session_id = imp_dbh->session;
     EXEC SQL END DECLARE SECTION;
@@ -242,9 +242,15 @@ dbd_db_login(dbh, dbname, user, pass)
         /* we have a username */
         if (dbis->debug >= 3) fprintf(DBILOGFP, "    user='%s', opt='%s'\n",
                                 user, opt);
-	if (*pass) {
+	if (pass && *pass) {
+#ifdef OPENINGRES
             EXEC SQL CONNECT :dbname SESSION :session
 		 IDENTIFIED BY :user DBMS_PASSWORD=:pass OPTIONS=:opt;
+#else
+            warn("non-OpenIngres: ignoring DBMS_PASSWORD");
+            EXEC SQL CONNECT :dbname SESSION :session
+		 IDENTIFIED BY :user OPTIONS=:opt;
+#endif
 	} else {
             EXEC SQL CONNECT :dbname SESSION :session
 		 IDENTIFIED BY :user OPTIONS=:opt;
@@ -282,6 +288,24 @@ dbd_db_do(dbh, statement, attribs, params)
     EXEC SQL EXECUTE IMMEDIATE :statement;
     if (!sql_check(dbh)) return -1;
     else return sqlca.sqlerrd[2]; /* rowcount */
+}
+
+int
+dbd_db_rows(dbh, imp_dbh)
+    SV *dbh;
+    imp_dbh_t *imp_dbh;
+{
+    EXEC SQL BEGIN DECLARE SECTION;
+    int rowcount;
+    EXEC SQL END DECLARE SECTION;
+    if (dbis->debug >= 2)
+	fprintf(DBILOGFP, "dbd_rows\n");
+    set_session(dbh);
+    EXEC SQL INQUIRE_INGRES(:rowcount = ROWCOUNT);
+    if (dbis->debug >= 2)
+	fprintf(DBILOGFP, "rowcount = %d\n", rowcount);
+    if (!sql_check(dbh)) return -1;
+    else return rowcount;
 }
 
 int

@@ -1,5 +1,5 @@
 /*
-#   $Id: Ingres.xs,v 2.100 1997/09/10 08:00:41 ht000 Exp $
+#   $Id: Ingres.xs,v 2.101 1997/09/12 06:26:47 ht000 Exp $
 #
 #   Copyright (c) 1994,1995,1996,1997  Tim Bunce
 #   Modified for DBD::Ingres by Henrik Tougaard <ht@datani.dk>
@@ -82,6 +82,14 @@ _do(dbh, statement, attribs="", params=Nullsv)
     } else {
         XST_mIV(0, retval);     /* rowcount */
     }
+
+void
+rows(dbh)
+    SV *	dbh
+    CODE:
+    D_imp_dbh(dbh);
+    XST_mIV(0, dbd_db_rows(dbh, imp_dbh));
+
 
 void
 commit(dbh)

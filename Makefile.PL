@@ -1,5 +1,5 @@
 #!/usr/local/bin/perl -sw
-# $Id: Makefile.PL,v 2.100 1997/09/10 08:00:41 ht000 Exp $
+# $Id: Makefile.PL,v 2.101 1997/09/12 06:26:47 ht000 Exp $
 
 require 5.003_93;
 
@@ -15,7 +15,7 @@ require FileHandle unless defined(&FileHandle::new);
 # For those not using Dynamic loading this means building a
 # new static perl in the DBI directory by saying 'make perl'
 # and then using _that_ perl to make this one.
-use DBI 0.82;
+use DBI 0.89;
 
 my %opts = (
     NAME => 'DBD::Ingres',
@@ -51,24 +51,32 @@ print "\n Configuring DBD::Ingres ...
 unless ($ENV{II_SYSTEM}){
     die "\$II_SYSTEM not defined. No Ingres?\n";
 }
-my $II = $ENV{II_SYSTEM};
+my $II_SYSTEM = $ENV{II_SYSTEM};
 
-print "Using Ingres in $II\n";
+print "Using Ingres in $II_SYSTEM\n";
 
 my $libhome = "";
-my $linkwith = "-L$II/ingres/lib -lingres";  # good (?) guess for 6.4
-if (-f "$II/ingres/files/abflnk.opt") {
+my $linkwith = "-L$II_SYSTEM/ingres/lib -lingres";  # good (?) guess for 6.4
+if (-f "$II_SYSTEM/ingres/files/abflnk.opt") {
     # the option file should give us all the libraries we need
-    open(ABFLNK, "$II/ingres/files/abflnk.opt")
+    open(ABFLNK, "$II_SYSTEM/ingres/files/abflnk.opt")
         or die "Can't read the option file ".
-               "'$II/ingres/files/abflnk.opt'\n";
+               "'$II_SYSTEM/ingres/files/abflnk.opt'\n";
     $linkwith = join(" ", <ABFLNK>);
     close ABFLNK;
     $linkwith =~ s/\n//g;
-    $linkwith =~ s/\$II_SYSTEM/$II/g;
-} elsif (-f "$II/ingres/lib/lcompat.1.so") {
+    $linkwith =~ s/\$II_SYSTEM/$II_SYSTEM/g;
+} elsif (-f "$II_SYSTEM/ingres/lib/libcompat.1.so") {
     $linkwith .= " -lcompat.1";   # OpenIngres without ABF.
 }
+# Adjust linkwith (some 6.4 version have the name of the library in abfopt.opt
+for ($linkwith) {
+   s{(/.*)/lib(.*?)\.a}{-L$1 -l$2};
+}
+
+# Try to figure out if this is an OPenIngres or not
+my $OpenIngres = (-f "$II_SYSTEM/ingres/lib/libcompat.1.so");
+
 my $linkopt = "";
 
 # --- Handle special cases ---
@@ -118,8 +126,8 @@ $opts{depend} = { "dbdimp\$(OBJ_EXT)" => "dbdimp.c Ingres.h",
 		  "Ingres\$(OBJ_EXT)" => "Ingres.h",
                 };
 $opts{clean} = { FILES => "dbdimp.c Ingres.h" };
-$opts{macro} = { ESQLC => "$II/ingres/bin/esqlc", ESQLCOPT => "-o.h" };
-
+$opts{macro} = { ESQLC => "$II_SYSTEM/ingres/bin/esqlc", ESQLCOPT => "-o.h" };
+$opts{DEFINE} = '-DOPENINGRES' if $OpenIngres;
 WriteMakefile(%opts);
 
 exit 0;

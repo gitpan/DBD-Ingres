@@ -1,3 +1,10 @@
+v0.05_92  1997.09.12 (early morning)
+    Ulrich Pfeifer <Ulrich.Pfeifer@de.uu.net> has come up with a solution to my
+    Makefile.PL problems with 'old' Ingres-versions. Thanks.
+    Ifdef'fed around Ingres6.4 (and earlier) non-awareness of DBMS_PASSWORD
+    $dbh->rows works again.
+    This version builds and tests cleanly for me.
+
 v0.05_91  1997.09.11
     I just got the binding to work. I hope :)
     Now only $dbh->rows is mucked up.
