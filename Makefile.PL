@@ -1,5 +1,5 @@
 #!/usr/local/bin/perl -sw
-# $Id: Makefile.PL,v 2.111 1999/10/26 06:53:57 ht000 Exp $
+# $Id: Makefile.PL,v 2.112 2000/01/31 07:43:32 ht000 Exp $
 
 require 5.004;
 
@@ -23,7 +23,7 @@ my $Is_NT = $Config{osname} eq 'MSWin32';
 my %opts = (
     NAME => 'DBD::Ingres',
     VERSION_FROM => 'Ingres.pm',
-    dist  => { DIST_DEFAULT=> 'clean distcheck disttest ci tardist',
+    dist  => { DIST_DEFAULT=> 'clean distcheck disttest tardist',
                PREOP => '$(MAKE) -f Makefile.old distdir',
 	       COMPRESS => 'gzip', SUFFIX => 'gz', },
     LINKTYPE => 'dynamic',
@@ -115,7 +115,7 @@ if ($Is_VMS) {
     $linkwith = "";
     $libhome = "";
     $ESQLC = "ESQLC";
-    $OpenIngres = 1; # help!!
+    $OpenIngres = -r "II_SYSTEM:[INGRES.FILES]CONFIG.DAT";
 } elsif ($Is_NT) {
     $ESQLC = $ENV{ESQLC} ||"$II_SYSTEM\\ingres\\bin\\esqlc.exe";
 } else {
@@ -226,7 +226,7 @@ $(BASEEXT).xsi: $(DBI_DRIVER_XST)
         my($self) = shift;
         local($_) = $self->SUPER::const_cccmd(@_);
         return $_ unless $::opt_g;
-        if ($::Is_VMS) {
+        if ($Is_VMS) {
             s!/[Oo][Pp][Tt][Ii]?[a-zA-Z]*!/NOOPTIMIZE/DEBUG!;
         } else {
             s/\s-O\d?\b/ -g/g;
@@ -236,7 +236,7 @@ $(BASEEXT).xsi: $(DBI_DRIVER_XST)
     sub dynamic_lib { # This affects only VMS
         my ($self) = shift;
         local($_) = $self->SUPER::dynamic_lib(@_);
-        return $_ unless $::Is_VMS;
+        return $_ unless $Is_VMS;
         s!perlshr_attr.opt/Option!perlshr_attr.opt/Option,$linkopt!;
         $_;
     };

@@ -1,5 +1,5 @@
 /*                               -*- Mode: C -*- 
- * $Id: dbdimp.psc,v 2.115 1999/10/28 10:36:25 ht000 Exp $
+ * $Id: dbdimp.psc,v 2.116 1999/11/19 09:04:31 ht000 Exp $
  *
  * Copyright (c) 1994,1995  Tim Bunce
  *           (c) 1996,1997  Henrik Tougaard
@@ -958,7 +958,7 @@ dbd_bind_ph (sth, imp_sth, param, value, sql_type, attribs, is_inout, maxlen)
 }
 
 int
-dbd_st_execute(sth, imp_sth)    /* <=0 is error, >0 is ok */
+dbd_st_execute(sth, imp_sth)    /* =0 is error, <>0 is ok */
     SV *sth;
     imp_sth_t *imp_sth;
 {
@@ -979,7 +979,7 @@ dbd_st_execute(sth, imp_sth)    /* <=0 is error, >0 is ok */
     if (!imp_sth->done_desc) {
         /* describe and allocate storage for results */
         if (!dbd_describe(sth, imp_sth))
-            return -2; /* dbd_describe already called sql_check() */
+            return 0; /* dbd_describe already called sql_check() */
     }
 
     /* Trigger execution of the statement */
@@ -997,7 +997,7 @@ dbd_st_execute(sth, imp_sth)    /* <=0 is error, >0 is ok */
         } else {
             EXEC SQL EXECUTE :name;
         }
-        return sql_check(sth) ? sqlca.sqlerrd[2] : -2;
+        return sql_check(sth) ? sqlca.sqlerrd[2] : 0;
     } else {
 	int is_readonly;
         /* select statement: open a cursor */
@@ -1031,9 +1031,9 @@ dbd_st_execute(sth, imp_sth)    /* <=0 is error, >0 is ok */
 		    EXEC SQL OPEN :name;
 		}
 	}
-        if (!sql_check(sth)) return -2;
+        if (!sql_check(sth)) return 0;
         DBIc_ACTIVE_on(imp_sth);
-        return -1;
+        return -1 /* Unknown number of rows */;
     }
 }
 

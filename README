@@ -4,17 +4,20 @@ This is the Database Driver for the Ingres family of database products.
 It requires Ingres 6.4 or OpenIngres 1.0 or newer,
 DBI 1.00 or newer, Perl5.004 or newer.
 
-Note:
-There are indications of memory corruption problems with Perl5.005_03.
-As of now (1999.05.25) the advice is to use Perl5.005_02.
-
-
-   Copyright (c) 1996,1997  Henrik Tougaard <ht@datani.dk>
+   Copyright (c) 1996,1997,1998,1999,2000  Henrik Tougaard <htoug@cpan.org>
 
    You may distribute under the terms of either the GNU General Public
    License or the Artistic License, as specified in the Perl README file.
 
 New features (See the CHANGES file for a complete list):
+v0.25       2000.01.31
+  Included patches for autodetect of OpenIngres on VMS, thanks to Sebastian
+  Bazley <Sebastian.BAZLEY@sema.co.uk>; Now build cleanly on VMS with DBI1.00.
+  Added RaiseError=>1 to the connect in t/dbi.t as per current
+  recomendation.
+  Changed the error return value of execute to 0 (not 0E0 which is the OK
+  with 0 rows), not -1, or -2 as it was. Wonder why though?
+
 v0.24       1999.10.29
   The "OF column..." part of the "FOR UPDATE" clause is optional.
   Clarified the pod (or tried to at least).
@@ -125,7 +128,7 @@ dlopen: Unresolved symbols at
             install_driver(Ingres) failed: Can't load '....DBD/Ingres/Ingres.so'
             for module DBD::Ingres: dlopen: cannot load ....
           usually indicates that the shared Ingres library is not in the
-          path for shraed libraries given in LD_LIBRARY_PATH
+          path for shared libraries given in LD_LIBRARY_PATH
 
 TO DO LIST:
 
@@ -173,6 +176,6 @@ Regards,
 Tim, Al & Henrik.
 
 
-Original document: (c)Tim Bunce <Tim.Bunce@ig.co.uk>
-Amendments: (c)Alligator Descartes <descarte@informix.com>
-Further amendments: (c)Henrik Tougaard <ht@datani.dk>
+Original document: (c)Tim Bunce
+Amendments: (c)Alligator Descartes
+Further amendments: (c)Henrik Tougaard <htoug@cpan.org>

@@ -45,7 +45,10 @@ sub connect_db($$) {
 
     print "Testing: DBI->connect('$dbname'):\n"
  	if $verbose;
-    my $dbh = DBI->connect($dbname, "", "", {AutoCommit => 0});
+    my $dbh = DBI->connect($dbname, "", "",
+	{ AutoCommit => 0,
+#          RaiseError => 1,
+        });
     $dbh->{ChopBlanks} = 1;
     if ($dbh) {
         print("1..$num_test\nok 1\n");

@@ -1,3 +1,11 @@
+v0.25       2000.01.31
+  Included patches for autodetect of OpenIngres on VMS, thanks to Sebastian
+  Bazley <Sebastian.BAZLEY@sema.co.uk>
+  Added RaiseError=>1 to the connect in t/dbi.t as per current
+  recomendation.
+  Changed the error return value of execute to 0 (not 0E0 which is the OK
+  with 0 rows), not -1, or -2 as it was. Wonder why though?
+
 v0.24       1999.10.29
   The "OF column..." part of the "FOR UPDATE" clause is optional.
   Clarified the pod (or tried to at least).
