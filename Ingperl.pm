@@ -1,5 +1,5 @@
 #
-# $Id: Ingperl.pm,v 2.101 1997/09/25 11:46:36 ht000 Exp $
+# $Id: Ingperl.pm,v 2.102 1997/10/30 06:02:56 ht000 Exp $
 #
 # Ingperl emulation interface for DBD::Ingres
 #
@@ -17,7 +17,7 @@ use DBI 0.73;
 use Exporter;
 use Carp;
 
-$VERSION = substr(q$Revision: 2.101 $, 10);
+$VERSION = substr(q$Revision: 2.102 $, 10);
 
 @ISA = qw(Exporter);
 
@@ -120,7 +120,7 @@ sub sql_close {
 sub sql_fetch {
     croak "Ingperl: No active cursor, at" unless $sql_sth;
     my(@row) = $sql_sth->fetchrow();
-    $sql_rowcount = $sth->rows();
+    $sql_rowcount = $sql_sth->rows();
     unless (@row) {
 	&sql_close();
 	return wantarray ? () : undef;
