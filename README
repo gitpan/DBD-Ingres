@@ -16,10 +16,10 @@ New features:
        use DBI qw(:sql_types);
        ....
        $sth = $dbh->prepare("insert into tab(c1, c2) values(?, ?)");
-       $sth->bind_param(1, "col 1", {TYPE => SQL_CHAR});
-       $sth->bind_param(2, 2, {TYPE => SQL_INTEGER});
+       $sth->bind_param(1, "col 1", SQL_CHAR);
+       $sth->bind_param(2, 2, SQL_INTEGER);
        $sth->execute;
-       $sth->bind_param(2, 7, {TYPE => SQL_INTEGER});
+       $sth->bind_param(2, 7, SQL_INTEGER);
        $sth->execute;
      (with appropriate errorchecks :) and have inserted two rows:
         'col 1', 2
@@ -38,11 +38,27 @@ New features:
      compliant with the DBI specs as of DBI version 0.90.
      This implies some changes that may break 'old' DBD::Ingres scripts.
      + $dbh->rows has been removed
+       This affects the Ingperl variable $sql_rowcount, which is no longer  
+       strictly read-only. I have done my best to ensure that this change
+       will not break ingperl- scripts.
+       DBD-style scripts will have to check that $dbh->rows is not used
+       - or wait for an error at runtime ;-}
      + newstyle connect has autocommit on, oldstyle (and ingperl) still
        has autocommit off.
      + Some $sth attributes have been renamed:
         SqlLen ->   ing_length
         SqlType ->  ing_type
+       The old names will be available for an undefined period.
+     + $sth->{TYPE} returns DBI-standard values:
+        int:     SQL_INTEGER
+        float:   SQL_FLOAT
+        money:   SQL_DECIMAL
+        char, varchar, text etc: SQL_CHAR/SQL_VARCHAR
+        date:    SQL_CHAR
+     + $sth->{ing_type} returns what $sth->{TYPE} used to return,
+       ie: 'i', 'f' and 's'. 
+
+   o Test scripts have been moved to the (normal) t/ directory.
    
 BEFORE BUILDING, TESTING AND INSTALLING this you will need to:
 
@@ -51,7 +67,7 @@ BEFORE BUILDING, TESTING AND INSTALLING this you will need to:
 
     Build, test and install the DBI module.
     It is very important to test it and install it!
-    *** DBI must be at least version 0.89 ***
+    *** DBI must be at least version 0.90 ***
 
 BUILDING
 
@@ -99,6 +115,8 @@ KNOWN PROBLEMS:
             database-name username other-options
           otherwise the check for username wil fail.
 
+        o VMS build fails. I have built with success on VMS after
+          'hacking' the descrip.mms file a bit.
 TO DO LIST:
 
         o Add support for OpenIngres 1.2: blobs  etc.

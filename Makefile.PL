@@ -1,5 +1,5 @@
 #!/usr/local/bin/perl -sw
-# $Id: Makefile.PL,v 2.104 1997/09/25 12:04:37 ht000 Exp $
+# $Id: Makefile.PL,v 2.105 1997/10/07 11:03:23 ht Exp $
 
 require 5.003_93;
 
@@ -17,6 +17,7 @@ require FileHandle unless defined(&FileHandle::new);
 # and then using _that_ perl to make this one.
 use DBI 0.89;
 use DBI::DBD;
+my $Is_VMS = $Config{osname} eq 'VMS';
 
 my %opts = (
     NAME => 'DBD::Ingres',
@@ -90,13 +91,23 @@ $opts{DEFINE} .= '-Xa' if $Config{cc} eq 'clcc';	# CenterLine CC
 warn "WARNING: Your GNU C compiler is very old. Please upgrade.\n"
     if ($Config{gccversion} and $Config{gccversion} =~ m/^(1|2\.[1-5])/);
 
+my $ESQLC = "$II_SYSTEM/ingres/bin/esqlc";
+
 # OpenVMS has specialities:
-if ($Config{osname} eq 'VMS') {
+if ($Is_VMS) {
     $opts{OPTIMIZE} = "/optimize/nowarning";
     $opts{CCCDLFLAGS}="/nowarning";
     $linkopt = "II_SYSTEM:[ingres.files]esql.opt/opt";
     $linkwith = "";
     $libhome = "";
+    $ESQLC = "ESQLC";
+    $OpenIngres = 1; # help!!
+} else {
+    # Non-vms checks:
+    # See if the ESQL-precompiler exists...
+    print "I can't find your Esql/C precompiler\n",
+          "Is your ingres set up correctly??\n"
+       unless -x $ESQLC;
 }
 
 # Solaris needs the elf-library
@@ -114,6 +125,7 @@ if ($Config{osname} eq 'hpux') {
 # log key platform information to help me help you quickly
 print "System: perl$] @Config{qw(myuname)}\n",
       "Compiler: @Config{qw(cc optimize ccflags)}\n",
+      "SQL-precompiler: $ESQLC\n",
       "Linking with $linkwith\n" if $Verbose;
 
 print "\n";
@@ -143,7 +155,7 @@ $opts{depend} = { "dbdimp\$(OBJ_EXT)" => "dbdimp.c Ingres.h",
 		  "Ingres\$(OBJ_EXT)" => "Ingres.h",
                 };
 $opts{clean} = { FILES => "dbdimp.c dbdimp.sc Ingres.h Ingres.sc Ingres.xsi" };
-$opts{macro} = { ESQLC => "$II_SYSTEM/ingres/bin/esqlc", ESQLCOPT => "-o.h" };
+$opts{macro} = { ESQLC => $ESQLC, ESQLCOPT => "-o.h" };
 $opts{DEFINE} = '-DOPENINGRES' if $OpenIngres;
 WriteMakefile(%opts);
 
@@ -165,6 +177,12 @@ sub MY::postamble {
 		    's!/\\*OI\\*!!' :    # Turn on OpenIngres or 
 		    's!/\\*64\\*!!';     # Ingres 6.4 parts of dbdimp.psc
 
+    my $driver_xst_path = $DBIXS_INSTALL_DIR."/Driver.xst";
+    if ($Is_VMS) {
+        require VMS::Filespec;
+        $driver_xst_path = VMS::Filespec::vmsify($driver_xst_path);
+    }
+
     q[
 dbdimp.c Ingres.h : dbdimp.sc Ingres.sh
 	$(ESQLC) $(ESQLCOPT) dbdimp.sc 
@@ -176,7 +194,7 @@ $(BASEEXT).xs: $(BASEEXT).xsi
 
 $(BASEEXT).c: $(BASEEXT).xsi
 
-DBI_DRIVER_XST = ].$DBIXS_INSTALL_DIR.q[/Driver.xst
+DBI_DRIVER_XST = ].$driver_xst_path.q[
 
 $(BASEEXT).xsi: $(DBI_DRIVER_XST)
 	perl -p -e "s/~DRIVER~/$(BASEEXT)/g" <$(DBI_DRIVER_XST) >$(BASEEXT).xsi

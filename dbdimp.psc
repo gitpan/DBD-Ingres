@@ -1,5 +1,5 @@
 /*
- * $Id: dbdimp.psc,v 2.106 1997/09/25 11:46:36 ht000 Exp $
+ * $Id: dbdimp.psc,v 2.107 1997/10/07 11:03:23 ht Exp $
  *
  * Copyright (c) 1994,1995  Tim Bunce
  *           (c) 1996,1997  Henrik Tougaard
@@ -374,7 +374,7 @@ dbd_db_get_dbevent(dbh, imp_dbh, wait)
     char event_database[80];
     char event_owner   [80];
     char event_text    [256];
-    char event_date    [26];
+    char event_time    [26];
     EXEC SQL END DECLARE SECTION;
 
     if (dbis->debug >= 2)
@@ -385,7 +385,7 @@ dbd_db_get_dbevent(dbh, imp_dbh, wait)
        :event_database = DBEVENTDATABASE,
        :event_text     = DBEVENTTEXT,
        :event_owner    = DBEVENTOWNER,
-       :event_date     = DBEVENTTIME
+       :event_time     = DBEVENTTIME
        );
     if (dbis->debug >= 2)
 	fprintf(DBILOGFP, "eventname = %s\n", event_name);
@@ -397,7 +397,7 @@ dbd_db_get_dbevent(dbh, imp_dbh, wait)
     hv_store(result, "database", sizeof("database")-1, newSVpv(event_database,0),0);
     hv_store(result, "text",     sizeof("text")    -1, newSVpv(event_text,    0),0);
     hv_store(result, "owner",    sizeof("owner")   -1, newSVpv(event_owner,   0),0);
-    hv_store(result, "time",     sizeof("time")    -1, newSVpv(event_date,    0),0);
+    hv_store(result, "time",     sizeof("time")    -1, newSVpv(event_time,    0),0);
     return(sv_2mortal(newRV_noinc((SV*)result)));
 }
 }
@@ -464,8 +464,10 @@ dbd_db_STORE_attrib(dbh, imp_dbh, keysv, valuesv)
     set_session(dbh);
     if (kl==10 && strEQ(key, "AutoCommit")){
         if (on) {
+	    EXEC SQL COMMIT;
             EXEC SQL SET AUTOCOMMIT ON;
         } else {
+	    EXEC SQL COMMIT;
             EXEC SQL SET AUTOCOMMIT OFF;
         }
         if (!sql_check(dbh)) {
@@ -903,7 +905,7 @@ dbd_st_fetch(sth, imp_sth)
         	SvPVX(fbh->sv)[fbh->len-1] = 0;
         	/* strip trailing blanks */
         	if (fbh->origtype == IISQ_CHA_TYPE
-                 && DBIc_on(imp_sth, DBIcf_ChopBlanks)) {
+                 && DBIc_has(imp_sth, DBIcf_ChopBlanks)) {
         	    for (ch = fbh->len - 2;
         	         SvPVX(fbh->sv)[ch] == ' ';
         	         --ch)
@@ -912,7 +914,8 @@ dbd_st_fetch(sth, imp_sth)
 	        sv_setsv(sv, fbh->sv);
 	        SvCUR(sv) = strlen(SvPVX(sv));
                 if (dbis->debug >= 3)
-                    fprintf(DBILOGFP, "Text: '%s'\n", SvPVX(sv));
+                    fprintf(DBILOGFP, "Text: '%s', Chop: %d\n",
+                        SvPVX(sv), DBIc_has(imp_sth, DBIcf_ChopBlanks));
 	        break;
 	    default:
 	        croak("Ingres: wierd field-type '%s' in field no. %d?\n",
@@ -1100,8 +1103,7 @@ dbd_st_FETCH_attrib(sth, imp_sth, keysv)
         retsv = newRV((SV*)av);
         while(--i >= 0)
             av_store(av, i, newSViv((IV)imp_sth->fbh[i].origlen));
-    } else if ((kl==9 && strEQ(key, "ing_types")) ||
-               (kl==12 && strEQ(key, "ing_ingtypes")) ||
+    } else if ((kl==12 && strEQ(key, "ing_ingtypes")) ||
                (kl==7 && strEQ(key, "SqlType")) ) {
         AV *av = newAV();
         retsv = newRV((SV*)av);

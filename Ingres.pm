@@ -1,4 +1,4 @@
-#   $Id: Ingres.pm,v 2.107 1997/09/25 11:46:36 ht000 Exp $
+#   $Id: Ingres.pm,v 2.108 1997/10/07 11:03:23 ht Exp $
 #
 #   Copyright (c) 1994,1995 Tim Bunce
 #             (c) 1996 Henrik Tougaard
@@ -34,8 +34,8 @@ DBD::Ingres - Ingres access interface for Perl5
     use DynaLoader ();
     @ISA = qw(DynaLoader);
 
-    $VERSION = '0.05_96';
-    my $Revision = substr(q$Revision: 2.107 $, 10);
+    $VERSION = '0.10';
+    my $Revision = substr(q$Revision: 2.108 $, 10);
 
     bootstrap DBD::Ingres $VERSION;
 
@@ -96,6 +96,13 @@ DBD::Ingres - Ingres access interface for Perl5
             or return undef;
 
         $this;
+    }
+
+    sub data_sources {
+	my ($drh) = @_;
+	warn("\$drh->data_sources() not defined for Ingres\n")
+	    if $drh->{"warn"};
+	"";
     }
 
 }

@@ -1,6 +1,6 @@
 #                              -*- Mode: Perl -*- 
 # $Basename$
-# $Revision: 1.1 $
+# $Revision: 1.2 $
 # Author          : Ulrich Pfeifer
 # Created On      : Mon Sep 22 09:07:49 1997
 # Last Modified By: Ulrich Pfeifer
@@ -24,6 +24,7 @@ print "Testing: DBI->connect('$dbname'):\n"
 ( $dbh = DBI->connect($dbname) )
     and print("ok $test\n") 
     or die "not ok $test: $DBI::errstr\n";
+$dbh->{AutoCommit} = 0;
 
 sub run_test ($ ) {
   my $cmd = shift;
@@ -96,13 +97,11 @@ print "Committing\n"
    or print "not ok $test: $DBI::errstr\n";
 
 $test++;
-print "Testing \$dbh->func('get_dbevent')\n"
+print "Testing \$dbh->func(10, 'get_dbevent')\n"
 	if $verbose;
-( my $event_ref = \$dbh->func(10, 'get_dbevent') )
+( $event = $dbh->func(10, 'get_dbevent') )
    and print "ok $test\n"
    or print "not ok $test: $DBI::errstr\n";
-
-my $event = $$event_ref;
 
 for (keys %$event) {
   printf "%-20s = '%s'\n", $_, $event->{$_};
@@ -113,7 +112,7 @@ run_test qq[
            ];
 
 $test++;
-print "Testing \$dbh->get_dbevent()')\n"
+print "Testing \$dbh->func('get_dbevent')\n"
 	if $verbose;
 ( $event = $dbh->func('get_dbevent') )
    and print "ok $test\n"
@@ -125,7 +124,7 @@ for (keys %$event) {
 
 # This one should time out
 $test++;
-print "Testing \$dbh->get_dbevent(10)')\nThis one should time out after 10 seconds\n"
+print "Testing \$dbh->func(10, 'get_dbevent')\nThis one should time out after 10 seconds\n"
 	if $verbose;
 ( $event = $dbh->func(10,'get_dbevent') )
    and print "not ok $test\n"

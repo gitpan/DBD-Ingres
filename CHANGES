@@ -1,3 +1,7 @@
+v0.10     1997.10.07
+    Release version - VMS does'nt work quite right, but it can muddle through.
+    DBD::Test tests passed.
+
 v0.05_96  1997.09.24
     Added get_event func. Thanks to Ulrich Pfeifer.
     Removed $dbh->rows. It was used by the ingperl emulation layer, and
