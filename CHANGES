@@ -1,4 +1,10 @@
-$Id: //depot/tilpasninger/dbd-ingres/CHANGES#4 $ $DateTime: 2001/01/12 14:02:34 $ $Revision: #4 $
+$Id: //depot/tilpasninger/dbd-ingres/CHANGES#6 $ $DateTime: 2001/03/02 14:15:40 $ $Author: ht000 $
+v0.28	    2001.02.26
+  The error handling did'nt call the DBIh_EVENT2 macro that properly
+  registers the error int the DBI.
+  Ingperl.pm had a bug in the $Revision string, which caused cpan.pm to
+  complain
+
 v0.27       2001.01.12
  $sth->{Statement} was not implemented. DBIx::XML_RDB needs it.
 

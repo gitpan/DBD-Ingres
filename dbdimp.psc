@@ -1,5 +1,5 @@
 /*                               -*- Mode: C -*- 
- * $Id: //depot/tilpasninger/dbd-ingres/dbdimp.psc#3 $
+ * $Id: //depot/tilpasninger/dbd-ingres/dbdimp.psc#4 $
  *
  * Copyright (c) 1994,1995  Tim Bunce
  *           (c) 1996,1997  Henrik Tougaard
@@ -67,6 +67,7 @@ sql_check(h)
     char errbuf[256];
     EXEC SQL END DECLARE SECTION;
     D_imp_xxh(h);
+    SV *errstr = DBIc_ERRSTR(imp_xxh);
 
     if (sqlca.sqlcode < 0) { 
         if (dbis->debug >= 3) 
@@ -85,9 +86,9 @@ sql_check(h)
         }
         if (dbis->debug >= 3) 
             fprintf(DBILOGFP, " got errtext: '%s'", errbuf);
-        sv_setpv(DBIc_ERRSTR(imp_xxh), (char*)errbuf);
-        if (dbis->debug >= 3) 
-            fprintf(DBILOGFP, ", returning\n");
+        sv_setpv(errstr, (char*)errbuf);
+        if (dbis->debug >= 3) fprintf(DBILOGFP, ", returning\n");
+	DBIh_EVENT2(h, ERROR_event, DBIc_ERR(imp_xxh), errstr);
         return 0;
     } else return 1;
 }
@@ -100,9 +101,11 @@ error(h, error_num, text, state)
     char * state;
 {
     D_imp_xxh(h);
+    SV *errstr = DBIc_ERRSTR(imp_xxh);
     sv_setiv(DBIc_ERR(imp_xxh), (IV)error_num);
-    sv_setpv(DBIc_ERRSTR(imp_xxh), text);
+    sv_setpv(errstr, text);
     if (state != 0) sv_setpv(DBIc_STATE(imp_xxh), state);
+    DBIh_EVENT2(h, ERROR_event, DBIc_ERR(imp_xxh), errstr);
 }
 
 static void

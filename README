@@ -9,27 +9,6 @@ DBI 1.00 or newer, Perl5.004 or newer.
    You may distribute under the terms of either the GNU General Public
    License or the Artistic License, as specified in the Perl README file.
 
-New features (See the CHANGES file for a complete list):
-v0.27       2001.01.12
- $sth->{Statement} was not implemented. DBIx::XML_RDB needs it.
-
-v0.26       2000.11.20
-  $dbh->table_info raised an Ingres error because of the null. This
-  has been worked around (Thanks to Dirk Kraemer <kraemer@rz.uni-kiel.de>).
-  Minor changes due to change of internal version control system from CVS
-  to Perforce.
-  Changed my old (now disfunctional) mail adress to the new (and hopefully
-  permanent one: htoug@cpan.org).
-  Removed some (2) occurences of \r in the code.
-
-v0.25       2000.01.31
-  Included patches for autodetect of OpenIngres on VMS, thanks to Sebastian
-  Bazley <Sebastian.BAZLEY@sema.co.uk>; Now build cleanly on VMS with DBI1.00.
-  Added RaiseError=>1 to the connect in t/dbi.t as per current
-  recomendation.
-  Changed the error return value of execute to 0 (not 0E0 which is the OK
-  with 0 rows), not -1, or -2 as it was. Wonder why though?
-
 BEFORE BUILDING, TESTING AND INSTALLING this you will need to:
 
     Build, test and install Perl 5.004 (or newer)
@@ -77,6 +56,33 @@ Makefile.PL command line and/or editing the Makefile.PL.
 
 You should never need to make any changes. If you do *please* let me
 know so that I can try to make it automatic in a later release.
+
+New features (See the CHANGES file for a complete list):
+v0.28       2001.02.26
+  The error handling did'nt call the DBIh_EVENT2 macro that properly
+  registers the error int the DBI.
+  Ingperl.pm had a bug in the $Revision string, which caused cpan.pm to
+  complain
+
+v0.27       2001.01.12
+ $sth->{Statement} was not implemented. DBIx::XML_RDB needs it.
+
+v0.26       2000.11.20
+  $dbh->table_info raised an Ingres error because of the null. This
+  has been worked around (Thanks to Dirk Kraemer <kraemer@rz.uni-kiel.de>).
+  Minor changes due to change of internal version control system from CVS
+  to Perforce.
+  Changed my old (now disfunctional) mail adress to the new (and hopefully
+  permanent one: htoug@cpan.org).
+  Removed some (2) occurences of \r in the code.
+
+v0.25       2000.01.31
+  Included patches for autodetect of OpenIngres on VMS, thanks to Sebastian
+  Bazley <Sebastian.BAZLEY@sema.co.uk>; Now build cleanly on VMS with DBI1.00.
+  Added RaiseError=>1 to the connect in t/dbi.t as per current
+  recomendation.
+  Changed the error return value of execute to 0 (not 0E0 which is the OK
+  with 0 rows), not -1, or -2 as it was. Wonder why though?
 
 KNOWN PROBLEMS:
 
