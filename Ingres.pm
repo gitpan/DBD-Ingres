@@ -1,4 +1,4 @@
-#   $Id: Ingres.pm,v 2.110 1997/11/21 08:30:47 ht000 Exp $
+#   $Id: Ingres.pm,v 2.111 1997/12/02 07:53:50 ht000 Exp $
 #
 #   Copyright (c) 1994,1995 Tim Bunce
 #             (c) 1996 Henrik Tougaard
@@ -34,8 +34,8 @@ DBD::Ingres - Ingres access interface for Perl5
     use DynaLoader ();
     @ISA = qw(DynaLoader);
 
-    $VERSION = '0.12';
-    my $Revision = substr(q$Revision: 2.110 $, 10);
+    $VERSION = '0.13';
+    my $Revision = substr(q$Revision: 2.111 $, 10);
 
     bootstrap DBD::Ingres $VERSION;
 

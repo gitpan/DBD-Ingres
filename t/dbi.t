@@ -127,10 +127,10 @@ ok(0, $dbh->{AutoCommit}, "AutoCommit switched on", 1);
 ok(0, $dbh->disconnect, "Disconnecting", 1);
 
 $dbh = DBI->connect("$dbname") or die "not ok 999 - died due to $DBI::errstr";
-#print "Autocommit = $dbh->{AutoCommit}\n";
-#ok(0, $dbh->{AutoCommit}, "AutoCommit switched on by default", 1);
+ok(0, $dbh->{AutoCommit}, "AutoCommit switched on by default", 1);
 $dbh and $dbh->{AutoCommit}=0;
 ok(0, !$dbh->{AutoCommit}, "AutoCommit switched off explicitly", 1);
+$dbh and $dbh->commit;
 $dbh and $dbh->disconnect;
 
 # Missing:
@@ -138,5 +138,5 @@ $dbh and $dbh->disconnect;
 #           outerjoin and nullability
 #   what else?
 
-BEGIN { $num_test = 31; }
+BEGIN { $num_test = 32; }
 

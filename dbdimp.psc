@@ -1,5 +1,5 @@
-/*
- * $Id: dbdimp.psc,v 2.108 1997/11/21 08:30:47 ht000 Exp $
+/*                               -*- Mode: C -*- 
+ * $Id: dbdimp.psc,v 2.109 1997/12/02 07:53:50 ht000 Exp $
  *
  * Copyright (c) 1994,1995  Tim Bunce
  *           (c) 1996,1997  Henrik Tougaard
@@ -274,8 +274,9 @@ dbd_db_login(dbh, imp_dbh, dbname, user, pass)
 /*OI*       EXEC SQL CONNECT :dbname SESSION :session
 		 IDENTIFIED BY :user DBMS_PASSWORD=:pass OPTIONS=:opt;
 /**/
+/*64*
             warn("non-OpenIngres: ignoring DBMS_PASSWORD");
-/*64*       EXEC SQL CONNECT :dbname SESSION :session
+            EXEC SQL CONNECT :dbname SESSION :session
 		 IDENTIFIED BY :user OPTIONS=:opt;
 /**/
 	} else {
@@ -294,13 +295,16 @@ dbd_db_login(dbh, imp_dbh, dbname, user, pass)
     if (!sql_check(dbh)) return 0;
     DBIc_IMPSET_on(imp_dbh);    /* imp_dbh set up now                   */
     DBIc_ACTIVE_on(imp_dbh);    /* call disconnect before freeing       */
-    {/* get default autocommit state, so DBI knows about it */
+    {
+      /* get default autocommit state, so DBI knows about it */
         EXEC SQL BEGIN DECLARE SECTION;
         int autocommit_state;
         EXEC SQL END DECLARE SECTION;
         
-	EXEC SQL SELECT(DBMSINFO('AUTOCOMMIT_STATE'))
+	EXEC SQL SELECT INT4(DBMSINFO('AUTOCOMMIT_STATE'))
 	    INTO :autocommit_state;
+        if (!sql_check(dbh)) return 0;
+
     	if (dbis->debug >= 3)
             fprintf(DBILOGFP,"DBD::Ingres::dbd_db_connect(AUTOCOMMIT=%d)\n",
                     autocommit_state);
@@ -489,20 +493,14 @@ dbd_db_STORE_attrib(dbh, imp_dbh, keysv, valuesv)
 	    EXEC SQL COMMIT;
             EXEC SQL SET AUTOCOMMIT ON;
     	    if (dbis->debug >= 3)
-        	fprintf(DBILOGFP,"ON)\n");
+        	fprintf(DBILOGFP,"ON), sqlcode=%d\n", sqlca.sqlcode);
         } else {
 	    EXEC SQL COMMIT;
             EXEC SQL SET AUTOCOMMIT OFF;
     	    if (dbis->debug >= 3)
-        	fprintf(DBILOGFP,"OFF)\n");
-        }
-        if (!sql_check(dbh)) {
-    	    /* XXX um, we can't return FALSE and true isn't acurate */
-	        /* the best we can do is cache an undef	*/
-            cachesv = &sv_undef;
+        	fprintf(DBILOGFP,"OFF), sqlcode=%d\n", sqlca.sqlcode);
         }
 	DBIc_set(imp_dbh, DBIcf_AutoCommit, on);
-        cachesv = (on) ? &sv_yes : &sv_no;	/* cache new state */
     } else {
         return FALSE;
     }
@@ -530,13 +528,15 @@ dbd_db_FETCH_attrib(dbh, imp_dbh, keysv)
         int autocommit_state;
         EXEC SQL END DECLARE SECTION;
         
-	EXEC SQL SELECT(DBMSINFO('AUTOCOMMIT_STATE'))
+	EXEC SQL SELECT INT4(DBMSINFO('AUTOCOMMIT_STATE'))
 	    INTO :autocommit_state;
     	if (dbis->debug >= 3)
-            fprintf(DBILOGFP,"DBD::Ingres::dbd_db_FETCH(AUTOCOMMIT=%d)\n",
-                    autocommit_state);
+            fprintf(DBILOGFP,"DBD::Ingres::dbd_db_FETCH(AUTOCOMMIT=%d)sqlca=%d\n",
+                    autocommit_state, sqlca.sqlcode);
 	DBIc_set(imp_dbh, DBIcf_AutoCommit, autocommit_state);
-        retsv = boolSV(autocommit_state);
+        retsv = newSVsv(boolSV(autocommit_state));
+        cacheit = FALSE;   /* Don't cache AutoCommit state - some
+                           /* fool^H^H^H^Huser may change it via SQL */
     }
 
     if (!retsv)
@@ -544,9 +544,8 @@ dbd_db_FETCH_attrib(dbh, imp_dbh, keysv)
 
     if (cacheit) { /* cache for next time (via DBI quick_FETCH) */
         hv_store((HV*)SvRV(dbh), key, kl, retsv, 0);
-        SvREFCNT_inc(retsv);    /* so sv_2mortal won't free it  */
     }
-    return sv_2mortal(retsv);
+    return (retsv);
 }
 
 
@@ -623,6 +622,20 @@ dbd_st_prepare(sth, imp_sth, statement, attribs)
         strcpy(sqlda->sqldaid, "SQLDA   ");
         sqlda->sqldabc = sizeof(IISQLDA);
         sqlda->sqln = IISQ_MAX_COLS;
+        {
+          /* initialize memory structures for bind variables. This is
+             used in bind() to decide if memory was allocated already */
+
+          int param_max = DBIc_NUM_PARAMS(imp_sth);
+          int param_no;
+          IISQLVAR* var;
+          
+          for (param_no=0; param_no < param_max; param_no++) {
+            var = &imp_sth->ph_sqlda.sqlvar[param_no];
+            var->sqldata = (char *) &sv_undef;
+            var->sqllen  = 0;
+          }
+        }
     }
 
     if (dbis->debug >= 2)
@@ -796,28 +809,69 @@ dbd_bind_ph (sth, imp_sth, param, value, sql_type, attribs, is_inout, maxlen)
     if (dbis->debug >= 3)
         fprintf(DBILOGFP, "  type=%d\n", type);
     switch (type) {
+      /* Poor mans memory management: We store the actual length of
+         the buffer one int below var->sqldata. */
     case 1: {/* int */
-    	int* ptr;
+        int* buf = ((int *) var->sqldata)-1;
+
+        if (var->sqldata == (char *)&sv_undef) {
+          Newz(42, buf, 2, int);
+          *buf = 2;
+          var->sqldata = (char*) (buf+1);
+        } else if (*buf < 2) {
+          Renew(buf, 2, int);
+          *buf = 2;
+          var->sqldata = (char*) (buf+1);
+        }
+	buf[1]       = (int)SvIV(value);
         var->sqlind = 0;
         var->sqllen = 4;
-        Newz(42, ptr, 1, int);
-	*ptr = (int)SvIV(value);
-        var->sqldata = (char*)ptr;
         var->sqltype = IISQ_INT_TYPE;
 	break; }
     case 2: {/* float */
-	double* ptr;
+        int*   buf      = ((int *) var->sqldata)-1;
+        int    need_int = (sizeof(int) + sizeof(double)+1)/sizeof(int);
+	double ptr;
+
+        if (var->sqldata == (char *)&sv_undef) {
+          Newz(42, buf, need_int, int);
+          *buf = need_int;
+          var->sqldata = (char*) (buf+1);
+        } else if (*buf < need_int) {
+          Renew(buf, need_int, int);
+          *buf = need_int;
+          var->sqldata = (char*) (buf+1);
+        }
+        ptr = (double)SvNV(value);
+        /* Double probably not aligned properly: may cause alignment
+           error in Ingres library? Hmm: works for Open Ingres 1.2 and
+           Ingres 6.4. Should we spend 8 bytes for the length tag? */
+        Move(&ptr, buf+1, 1, double); 
         var->sqlind = 0;
         var->sqllen = 8;
-        Newz(42, ptr, 1, double);
-	*ptr = (double)SvNV(value);
-        var->sqldata = (char*)ptr;
         var->sqltype = IISQ_FLT_TYPE;
         break; }
     case 3: {/* string */
+        STRLEN strlen;
+        char   *string  = SvPV(value,strlen);
+        int    *buf     = ((int *) var->sqldata)-1;
+        int    need_int = (strlen * sizeof(char)+sizeof(int)+1)/sizeof(int);
+        
+        if (var->sqldata == (char *)&sv_undef) { /* initital allocation */
+          Newz(42, buf, need_int, int);
+          *buf = need_int;
+          var->sqldata = (char *) (buf+1);
+        } else {
+          buf = ((int *) var->sqldata)-1; 
+          if (*buf < need_int) { /* need to reallocate? */
+            Renew(buf, need_int, int);
+            *buf = need_int;
+            var->sqldata = (char *) (buf+1);
+          }
+        }
+        Move(string, var->sqldata, strlen, char);
         var->sqlind = 0;
-        var->sqldata = savepv(SvPV(value, na));
-        var->sqllen = strlen(var->sqldata);
+        var->sqllen  = strlen;
         var->sqltype = IISQ_CHA_TYPE;
         break; }
     }
@@ -844,6 +898,7 @@ dbd_st_execute(sth, imp_sth)	/* <=0 is error, >0 is ok */
 
     /* Trigger execution of the statement			*/
     set_session(DBIc_PARENT_H(imp_sth));
+
     if (DBIc_NUM_FIELDS(imp_sth) == 0) {
         /* non-select statement: just execute it */
         if (dbis->debug >= 2)
@@ -1092,12 +1147,12 @@ dbd_st_FETCH_attrib(sth, imp_sth, keysv)
     if (kl==8 && strEQ(key, "ing_type") ||
         kl==9 && strEQ(key, "ing_types")){
         AV *av = newAV();
-        retsv = newRV((SV*)av);
+        retsv = newRV_noinc((SV*)av);
         while(--i >= 0)
             av_store(av, i, newSVpv(imp_sth->fbh[i].type, 0));
     } else if (kl==4 && strEQ(key, "TYPE")){
         AV *av = newAV();
-        retsv = newRV((SV*)av);
+        retsv = newRV_noinc((SV*)av);
         while(--i >= 0) {
             int type;
             switch (imp_sth->fbh[i].origtype) {
@@ -1126,25 +1181,25 @@ dbd_st_FETCH_attrib(sth, imp_sth, keysv)
         }
     } else if (kl==8 && strEQ(key, "NULLABLE")){
         AV *av = newAV();
-        retsv = newRV((SV*)av);
+        retsv = newRV_noinc((SV*)av);
         while(--i >= 0)
             av_store(av, i, (imp_sth->fbh[i].nullable) ? &sv_yes : &sv_no);
     } else if (kl==4 && strEQ(key, "NAME")){
         AV *av = newAV();
-        retsv = newRV((SV*)av);
+        retsv = newRV_noinc((SV*)av);
         while(--i >= 0)
             av_store(av, i, newSVpv(imp_sth->fbh[i].var->sqlname.sqlnamec,
                         imp_sth->fbh[i].var->sqlname.sqlnamel));
     } else if (kl==11 && strEQ(key, "ing_lengths") ||
                kl==6 && strEQ(key, "SqlLen")){
         AV *av = newAV();
-        retsv = newRV((SV*)av);
+        retsv = newRV_noinc((SV*)av);
         while(--i >= 0)
             av_store(av, i, newSViv((IV)imp_sth->fbh[i].origlen));
     } else if ((kl==12 && strEQ(key, "ing_ingtypes")) ||
                (kl==7 && strEQ(key, "SqlType")) ) {
         AV *av = newAV();
-        retsv = newRV((SV*)av);
+        retsv = newRV_noinc((SV*)av);
         while(--i >= 0)
             av_store(av, i, newSViv((IV)imp_sth->fbh[i].origtype));
     } else {

@@ -1,5 +1,5 @@
 #!/usr/local/bin/perl -sw
-# $Id: Makefile.PL,v 2.105 1997/10/07 11:03:23 ht Exp $
+# $Id: Makefile.PL,v 2.106 1997/12/02 07:53:50 ht000 Exp $
 
 require 5.003_93;
 
@@ -190,7 +190,7 @@ dbdimp.c Ingres.h : dbdimp.sc Ingres.sh
 dbdimp.sc: dbdimp.psc
 	$(PERL) -p -e '].$subst.q[' dbdimp.psc > dbdimp.sc
 
-$(BASEEXT).xs: $(BASEEXT).xsi
+$(BASEEXT).xs: $(BASEEXT).xsi].($Is_VMS ? "\n\tcontinue" : "").q[
 
 $(BASEEXT).c: $(BASEEXT).xsi
 

@@ -1,3 +1,8 @@
+v0.13     1997.11.28
+    Found (one of the) AutoCommit bug(s)! Needs an update to DBI to work
+    properly. (Autocommit state is not initialized).
+    Fixed serious memory leak in binding core (Thanks to Ulrich Pfeifer).
+
 v0.12     1997.11.14
     Remove the trailing "\n" from Ingres error messages, so that
     $dbh->{RaiseError} and $dbh->{PrintError} can return a stack-traceback.
