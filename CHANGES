@@ -1,4 +1,6 @@
-$Id: //depot/tilpasninger/dbd-ingres/CHANGES#3 $ $DateTime: 2000/11/20 10:05:47 $ $Revision: #3 $
+$Id: //depot/tilpasninger/dbd-ingres/CHANGES#4 $ $DateTime: 2001/01/12 14:02:34 $ $Revision: #4 $
+v0.27       2001.01.12
+ $sth->{Statement} was not implemented. DBIx::XML_RDB needs it.
 
 v0.26       2000.11.20
   $dbh->table_info raised an Ingres error because of the null. This

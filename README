@@ -10,6 +10,9 @@ DBI 1.00 or newer, Perl5.004 or newer.
    License or the Artistic License, as specified in the Perl README file.
 
 New features (See the CHANGES file for a complete list):
+v0.27       2001.01.12
+ $sth->{Statement} was not implemented. DBIx::XML_RDB needs it.
+
 v0.26       2000.11.20
   $dbh->table_info raised an Ingres error because of the null. This
   has been worked around (Thanks to Dirk Kraemer <kraemer@rz.uni-kiel.de>).
