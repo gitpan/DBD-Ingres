@@ -1,4 +1,4 @@
-# $Id: //depot/tilpasninger/dbd-ingres/Ingres.pm#6 $ $DateTime: 2001/04/03 14:23:26 $ $Revision: #6 $
+# $Id: //depot/tilpasninger/dbd-ingres/Ingres.pm#7 $ $DateTime: 2001/11/19 12:17:47 $ $Revision: #7 $
 #
 #   Copyright (c) 1996-2000 Henrik Tougaard
 #
@@ -34,8 +34,8 @@ DBD::Ingres - DBI driver for Ingres database systems
     use DynaLoader ();
     @ISA = qw(DynaLoader);
 
-    $VERSION = '0.30';
-    my $Revision = substr(q$Change: 2236 $, 8)/100;
+    $VERSION = '0.31';
+    my $Revision = substr(q$Change: 4536 $, 8)/100;
 
     bootstrap DBD::Ingres $VERSION;
 
@@ -113,7 +113,10 @@ DBD::Ingres - DBI driver for Ingres database systems
         my($dbh, $statement, $attribs, @params) = @_;
         Carp::carp "DBD::Ingres::\$dbh->do() attribs unused\n" if $attribs;
         Carp::carp "DBD::Ingres::\$dbh->do() params unused\n" if @params;
-        DBD::Ingres::db::_do($dbh, $statement);
+	$dbh->{Statement} = $statement;
+        my $numrows = DBD::Ingres::db::_do($dbh, $statement);
+	undef $dbh->{Statement};
+	return $numrows;
     }
 
     sub prepare {

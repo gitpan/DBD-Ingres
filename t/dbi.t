@@ -14,6 +14,7 @@ sub ok ($$$;$) {
     ($ok) ? print "ok $t\n" : print "not ok $t\n";
     if (!$ok && $warn) {
 	$warn = $DBI::errstr if $warn eq '1';
+	$warn = "" unless $warn;
 	warn "$expl $warn\n";
     }
 }
@@ -127,7 +128,8 @@ ok(0, $cursor->finish, "finish(cursor)", 1);
 ok(0, $dbh->do(
         "UPDATE $testtable SET id = 3 WHERE name = 'Alligator Descartes'"),
      "do(Update) one row", 1);
-ok(0, my $numrows = $dbh->do( "UPDATE $testtable SET id = id+1" ),
+my $numrows;
+ok(0, $numrows = $dbh->do( "UPDATE $testtable SET id = id+1" ),
      "do(Update) all rows", 1);
 ok(0, $numrows == 2, "Number of rows", "should be '2' is '$numrows'");
 

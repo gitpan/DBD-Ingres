@@ -1,4 +1,10 @@
-$Id: //depot/tilpasninger/dbd-ingres/CHANGES#8 $ $DateTime: 2001/04/03 14:23:26 $ $Author: ht000 $
+$Id: //depot/tilpasninger/dbd-ingres/CHANGES#9 $ $DateTime: 2001/11/19 12:17:47 $ $Author: ht000 $
+
+v0.31       2001.09.17
+ -To aid errorhandling dbh->{Statement} will contain the text of the SQL
+  statement being executed during $dbh->do calls. This is an extension to
+  the normal DBI spec due to the special handling of $dbh->do in DBD::Ingres.
+ -Minor improvents in the tests.
 
 v0.30       2001.04.03
   Version 0.29 withdrawn. The changes cause too many problems
