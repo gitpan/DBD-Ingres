@@ -976,7 +976,15 @@ dbd_st_execute(sth, imp_sth)    /* =0 is error, <>0 is ok */
 
     /* needs to check for re-prepare (after commit etc.) */
     if (imp_sth->trans_no != imp_dbh->trans_no) {
-        croak("DBD::Ingres: Attempt to execute a statement after commit");
+      croak("DBD::Ingres: Attempt to execute a statement after commit");
+      /* XXX 1. attempt at new code, prepare for _cached etc. */
+      /* After a commit/rollback we must reprepare the statement
+	 and the continue from here.
+	 The statement is in $sth->{Statement}, and should be OK. */
+      /** commented out XXX **
+      dbd_st_finish(sth, imp_sth);
+      dbd_st_prepare(sth, imp_sth, <statement>, <attribs>);
+      XXX **/
     }
 
     if (!imp_sth->done_desc) {
@@ -1011,7 +1019,8 @@ dbd_st_execute(sth, imp_sth)    /* =0 is error, <>0 is ok */
 	{
 	  SV** svp;
 	  if ( (svp = hv_fetch((HV*)SvRV(sth), "ing_readonly", 12, 0)) != NULL
-	      && SvTRUE(*svp)) is_readonly = 1;
+	      && SvTRUE(*svp) )
+	       is_readonly = 1;
 	  else is_readonly = 0;
 	}
         if (dbis->debug >= 2)
@@ -1107,20 +1116,25 @@ dbd_st_fetch(sth, imp_sth)
                     fprintf(DBILOGFP, "Double: %lf\n", SvNV(sv));
                 break;
             case 's':
-                SvCUR(fbh->sv) = fbh->len;
+                SvCUR_set(fbh->sv, fbh->len);
                 SvPVX(fbh->sv)[fbh->len-1] = 0;
                 /* strip trailing blanks */
                 if ((fbh->origtype == IISQ_DTE_TYPE ||
                      fbh->origtype == IISQ_CHA_TYPE ||
                      fbh->origtype == IISQ_TXT_TYPE)
                  && DBIc_has(imp_sth, DBIcf_ChopBlanks)) {
-                    for (ch = fbh->len - 2;
-                         SvPVX(fbh->sv)[ch] == ' ';
-                         --ch)
-                             SvPVX(fbh->sv)[ch] = 0;
-                }
-                sv_setsv(sv, fbh->sv);
-                SvCUR(sv) = strlen(SvPVX(sv));
+		  /* Copy zero-terminated string after stripping blanks */
+		  for (ch = fbh->len - 2;
+		       SvPVX(fbh->sv)[ch] == ' ';
+		       --ch)
+		    SvPVX(fbh->sv)[ch] = 0;
+		  sv_setsv(sv, fbh->sv);
+		  SvCUR_set(sv, strlen(SvPVX(sv)));
+                } else {
+		  /* just copy, even zero-chars */
+		  sv_setsv(sv, fbh->sv);
+		  SvCUR_set(fbh->sv, fbh->len);
+		}
                 if (dbis->debug >= 3)
                     fprintf(DBILOGFP, "Text: '%s', Chop: %d\n",
                         SvPVX(sv), DBIc_has(imp_sth, DBIcf_ChopBlanks));

@@ -58,6 +58,11 @@ You should never need to make any changes. If you do *please* let me
 know so that I can try to make it automatic in a later release.
 
 New features (See the CHANGES file for a complete list):
+v0.29       2001.03.20
+  Fetch of binary data (ie CHAR or VARCHAR containing '\0' chars) didn't
+  work. The fields were truncated at the \0-char. Pointed out by               
+  Mike Yudaken <miyu@icon.co.za>.                                              
+
 v0.28       2001.02.26
   The error handling did'nt call the DBIh_EVENT2 macro that properly
   registers the error int the DBI.

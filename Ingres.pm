@@ -34,7 +34,7 @@ DBD::Ingres - DBI driver for Ingres database systems
     use DynaLoader ();
     @ISA = qw(DynaLoader);
 
-    $VERSION = '0.28';
+    $VERSION = '0.29';
     my $Revision = substr(q$Change: 1904 $, 8)/100;
 
     bootstrap DBD::Ingres $VERSION;
@@ -322,6 +322,12 @@ limitations that this implies.
 
 Placeholders and binding is not supported with C<$dbh-E<gt>do>.
 
+=item ChopBlanks and binary data
+
+Fetching of binary data is not possible if ChopBlanks is set. ChopBlanks
+uses a \0 character internally to mark the end of the field, so returned
+will be truncated at the first \0 character.
+
 =item ing_readonly
 
 Normally cursors are declared C<READONLY> 
@@ -394,7 +400,7 @@ Contains the text of the SQL-statement. Used mainly for debugging.
 
 This is B<exactly> the same as the new and DBI-supported
 C<$sth-E<gt>{Statement}>
-and the use of C<$sth-E<gt>{ing_statement}> is depreceated.
+and B<the use of C<$sth-E<gt>{ing_statement}> is depreceated>.
 
 =item ing_types
 
