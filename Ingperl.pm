@@ -1,5 +1,5 @@
 #
-# $Id: Ingperl.pm,v 2.102 1997/10/30 06:02:56 ht000 Exp $
+# $Id: Ingperl.pm,v 2.103 1997/11/21 08:30:15 ht Exp $
 #
 # Ingperl emulation interface for DBD::Ingres
 #
@@ -17,7 +17,7 @@ use DBI 0.73;
 use Exporter;
 use Carp;
 
-$VERSION = substr(q$Revision: 2.102 $, 10);
+$VERSION = substr(q$Revision: 2.103 $, 10);
 
 @ISA = qw(Exporter);
 
@@ -230,14 +230,15 @@ sub FETCH {
     } elsif ($$self eq "readonly") {
     	1;   # Not implemented (yet)
     } elsif ($$self eq "showerror") {
-    	$Ingperl::sql_dbh->{printerror};
+    	$Ingperl::sql_dbh->{printerror} if defined $Ingperl::sql_dbh;
     } else {
         carp "unknown special variable $$self";
     }
 }
 
 sub STORE {
-    my ($self, $value) = shift;
+    my $self = shift;
+    my $value = shift;
     confess "wrong type" unless ref $self;
     croak "too many arguments" if @_;
     if ($$self eq "showerror") {

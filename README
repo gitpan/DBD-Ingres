@@ -5,12 +5,19 @@ DBD::Ingres --  an Ingres interface for Perl 5 using DBI.
    You may distribute under the terms of either the GNU General Public
    License or the Artistic License, as specified in the Perl README file.
 
-ANNOUNCEMENT:
-
-A new version of DBD::Ingres has just been uploaded to CPAN.
-It will appear in the mirrors during the next couple of days.
-
 New features:
+v0.12:
+    Remove the trailing "\n" from Ingres error messages, so that
+    $dbh->{RaiseError} and $dbh->{PrintError} can return a stack-traceback.
+    Add tests to dbi.t for {AutoCommit}, and get autocommitstate at connect-
+    time. (Ulrich Pfeifer).
+    Return UNDEF from $dbh->execute when errors occur. (Ulrich Pfeifer).
+
+v0.11:
+    Bug in Ingperl.pm &sql_fetch used $sth instead of $sql_sth - funny
+    that nobody noticed before now.
+
+v0.10:
    o Support for placeholders and binding.
      You can now do:
        use DBI qw(:sql_types);
@@ -117,10 +124,11 @@ KNOWN PROBLEMS:
 
         o VMS build fails. I have built with success on VMS after
           'hacking' the descrip.mms file a bit.
+
 TO DO LIST:
 
-        o Add support for OpenIngres 1.2: blobs  etc.
-
+        o Add support for OpenIngres long datatypes.
+        o Make cursors updateable.
 
 IF YOU HAVE PROBLEMS:
 

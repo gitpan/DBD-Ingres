@@ -117,15 +117,26 @@ ok(0, my $numrows = $dbh->do( "UPDATE $testtable SET id = id+1" ),
      "do(Update) all rows", 1);
 ok(0, $numrows == 2, "Number of rows", "should be '2' is '$numrows'");
 
-ok(0, $dbh->do( "DROP TABLE $testtable" ),
-     "Dropping table", 1);
+ok(0, $dbh->do( "DROP TABLE $testtable" ), "Dropping table", 1);
 ok(0, $dbh->rollback, "Rolling back", 1);
+#   What else??
+ok(0, !$dbh->{AutoCommit}, "AutoCommit switched off upon connect time", 1);
+$dbh->{AutoCommit}=1;
+ok(0, $dbh->{AutoCommit}, "AutoCommit switched on", 1);
+
 ok(0, $dbh->disconnect, "Disconnecting", 1);
 
+$dbh = DBI->connect("$dbname") or die "not ok 999 - died due to $DBI::errstr";
+#print "Autocommit = $dbh->{AutoCommit}\n";
+#ok(0, $dbh->{AutoCommit}, "AutoCommit switched on by default", 1);
+$dbh and $dbh->{AutoCommit}=0;
+ok(0, !$dbh->{AutoCommit}, "AutoCommit switched off explicitly", 1);
+$dbh and $dbh->disconnect;
+
 # Missing:
-#   test of ChopBlanks, Autocommit, etc.
+#   test of ChopBlanks etc.
 #           outerjoin and nullability
 #   what else?
 
-BEGIN { $num_test = 28; }
+BEGIN { $num_test = 31; }
 

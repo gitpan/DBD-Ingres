@@ -1,4 +1,4 @@
-#   $Id: Ingres.pm,v 2.109 1997/10/30 06:02:56 ht000 Exp $
+#   $Id: Ingres.pm,v 2.110 1997/11/21 08:30:47 ht000 Exp $
 #
 #   Copyright (c) 1994,1995 Tim Bunce
 #             (c) 1996 Henrik Tougaard
@@ -34,8 +34,8 @@ DBD::Ingres - Ingres access interface for Perl5
     use DynaLoader ();
     @ISA = qw(DynaLoader);
 
-    $VERSION = '0.11';
-    my $Revision = substr(q$Revision: 2.109 $, 10);
+    $VERSION = '0.12';
+    my $Revision = substr(q$Revision: 2.110 $, 10);
 
     bootstrap DBD::Ingres $VERSION;
 
@@ -240,7 +240,7 @@ parsing by adding an attribute to the select-call:
 
     $dbh-E<gt>prepare($statement, %attribs)
 
-$attribs{"ing_outerjoin"} should contain true for outerjoins and false
+C<$attribs{"ing_outerjoin"}> should contain true for outerjoins and false
 otherwise.
 
 Eg:
@@ -332,7 +332,7 @@ Not yet implemented - on the ToDo list.
 
 It should be possible to do something like this:
 
-    $sth = $dbh->prepare("select a,b,c from t", "ing_update" => [b,c]);
+    $sth = $dbh->prepare("select a,b,c from t", ing_update => "b, c");
     $sth->execute;
     $row = $sth->fetchrow_arrayref;
     $dbh->do("update t set b='1' where current of $sth->{CursorName}");

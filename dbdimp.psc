@@ -1,5 +1,5 @@
 /*
- * $Id: dbdimp.psc,v 2.107 1997/10/07 11:03:23 ht Exp $
+ * $Id: dbdimp.psc,v 2.108 1997/11/21 08:30:47 ht000 Exp $
  *
  * Copyright (c) 1994,1995  Tim Bunce
  *           (c) 1996,1997  Henrik Tougaard
@@ -76,6 +76,14 @@ sql_check(h)
         if (dbis->debug >= 3) 
             fprintf(DBILOGFP, " get errtext");
         EXEC SQL INQUIRE_INGRES(:errbuf = ERRORTEXT);
+	{ /* remove trailing "\n" */
+	   int i = strlen(errbuf)-1;
+if (dbis->debug >= 4) fprintf(DBILOGFP, "last char = '%d', ", errbuf[i]);
+	   while ((errbuf[i] == '\n' || errbuf[i] == ' ') && i > 1) {
+		errbuf[i] = 0;
+		--i;
+	   }
+	}
         if (dbis->debug >= 3) 
             fprintf(DBILOGFP, " got errtext: '%s'", errbuf);
         sv_setpv(DBIc_ERRSTR(imp_xxh), (char*)errbuf);
@@ -286,6 +294,18 @@ dbd_db_login(dbh, imp_dbh, dbname, user, pass)
     if (!sql_check(dbh)) return 0;
     DBIc_IMPSET_on(imp_dbh);    /* imp_dbh set up now                   */
     DBIc_ACTIVE_on(imp_dbh);    /* call disconnect before freeing       */
+    {/* get default autocommit state, so DBI knows about it */
+        EXEC SQL BEGIN DECLARE SECTION;
+        int autocommit_state;
+        EXEC SQL END DECLARE SECTION;
+        
+	EXEC SQL SELECT(DBMSINFO('AUTOCOMMIT_STATE'))
+	    INTO :autocommit_state;
+    	if (dbis->debug >= 3)
+            fprintf(DBILOGFP,"DBD::Ingres::dbd_db_connect(AUTOCOMMIT=%d)\n",
+                    autocommit_state);
+	DBIc_set(imp_dbh, DBIcf_AutoCommit, autocommit_state);
+    }
     return 1;
 }
 
@@ -463,18 +483,25 @@ dbd_db_STORE_attrib(dbh, imp_dbh, keysv, valuesv)
 
     set_session(dbh);
     if (kl==10 && strEQ(key, "AutoCommit")){
+    	if (dbis->debug >= 3)
+            fprintf(DBILOGFP,"DBD::Ingres::dbd_db_STORE(AUTOCOMMIT=");
         if (on) {
 	    EXEC SQL COMMIT;
             EXEC SQL SET AUTOCOMMIT ON;
+    	    if (dbis->debug >= 3)
+        	fprintf(DBILOGFP,"ON)\n");
         } else {
 	    EXEC SQL COMMIT;
             EXEC SQL SET AUTOCOMMIT OFF;
+    	    if (dbis->debug >= 3)
+        	fprintf(DBILOGFP,"OFF)\n");
         }
         if (!sql_check(dbh)) {
     	    /* XXX um, we can't return FALSE and true isn't acurate */
 	        /* the best we can do is cache an undef	*/
             cachesv = &sv_undef;
         }
+	DBIc_set(imp_dbh, DBIcf_AutoCommit, on);
         cachesv = (on) ? &sv_yes : &sv_no;	/* cache new state */
     } else {
         return FALSE;
@@ -503,12 +530,18 @@ dbd_db_FETCH_attrib(dbh, imp_dbh, keysv)
         int autocommit_state;
         EXEC SQL END DECLARE SECTION;
         
-	EXEC SQL SELECT(DBMSINFO('autocommit_state'))
+	EXEC SQL SELECT(DBMSINFO('AUTOCOMMIT_STATE'))
 	    INTO :autocommit_state;
-	return newSViv((IV)autocommit_state);
-    } else {
-        return Nullsv;
+    	if (dbis->debug >= 3)
+            fprintf(DBILOGFP,"DBD::Ingres::dbd_db_FETCH(AUTOCOMMIT=%d)\n",
+                    autocommit_state);
+	DBIc_set(imp_dbh, DBIcf_AutoCommit, autocommit_state);
+        retsv = boolSV(autocommit_state);
     }
+
+    if (!retsv)
+	return Nullsv;
+
     if (cacheit) { /* cache for next time (via DBI quick_FETCH) */
         hv_store((HV*)SvRV(dbh), key, kl, retsv, 0);
         SvREFCNT_inc(retsv);    /* so sv_2mortal won't free it  */
@@ -806,7 +839,7 @@ dbd_st_execute(sth, imp_sth)	/* <=0 is error, >0 is ok */
     if (!imp_sth->done_desc) {
         /* describe and allocate storage for results		*/
         if (!dbd_describe(sth, imp_sth))
-            return -1; /* dbd_describe already called sql_check()	*/
+            return -2; /* dbd_describe already called sql_check()	*/
     }
 
     /* Trigger execution of the statement			*/
@@ -823,7 +856,7 @@ dbd_st_execute(sth, imp_sth)	/* <=0 is error, >0 is ok */
         } else {
             EXEC SQL EXECUTE :name;
         }
-        return sql_check(sth) ? sqlca.sqlerrd[2] : -1;
+        return sql_check(sth) ? sqlca.sqlerrd[2] : -2;
     } else {
         /* select statement: open a cursor */
         if (dbis->debug >= 2)
@@ -837,9 +870,9 @@ dbd_st_execute(sth, imp_sth)	/* <=0 is error, >0 is ok */
         } else {
             EXEC SQL OPEN :name FOR READONLY;
         }
-        if (!sql_check(sth)) return -1;
+        if (!sql_check(sth)) return -2;
         DBIc_ACTIVE_on(imp_sth);
-        return 0;
+        return -1;
     }
 }
 
@@ -904,7 +937,9 @@ dbd_st_fetch(sth, imp_sth)
         	SvCUR(fbh->sv) = fbh->len;
         	SvPVX(fbh->sv)[fbh->len-1] = 0;
         	/* strip trailing blanks */
-        	if (fbh->origtype == IISQ_CHA_TYPE
+        	if ((fbh->origtype == IISQ_DTE_TYPE ||
+        	     fbh->origtype == IISQ_CHA_TYPE ||
+        	     fbh->origtype == IISQ_TXT_TYPE)
                  && DBIc_has(imp_sth, DBIcf_ChopBlanks)) {
         	    for (ch = fbh->len - 2;
         	         SvPVX(fbh->sv)[ch] == ' ';
@@ -1054,7 +1089,8 @@ dbd_st_FETCH_attrib(sth, imp_sth, keysv)
 
     i = DBIc_NUM_FIELDS(imp_sth);
 
-    if (kl==8 && strEQ(key, "ing_type")){
+    if (kl==8 && strEQ(key, "ing_type") ||
+        kl==9 && strEQ(key, "ing_types")){
         AV *av = newAV();
         retsv = newRV((SV*)av);
         while(--i >= 0)
@@ -1076,9 +1112,11 @@ dbd_st_FETCH_attrib(sth, imp_sth, keysv)
                 break;
             case IISQ_DTE_TYPE:
             case IISQ_CHA_TYPE:
-            case IISQ_VCH_TYPE:
             case IISQ_TXT_TYPE:
                 type = SQL_CHAR;
+                break;
+            case IISQ_VCH_TYPE:
+                type = SQL_VARCHAR;
                 break;
             default:        /* oh dear! */
                 type = 0;

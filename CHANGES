@@ -1,3 +1,15 @@
+v0.12     1997.11.14
+    Remove the trailing "\n" from Ingres error messages, so that
+    $dbh->{RaiseError} and $dbh->{PrintError} can return a stack-traceback.
+    Add tests to dbi.t for {AutoCommit}, and get autocommitstate at connect-
+    time. (Ulrich Pfeifer).
+    Return UNDEF from $dbh->execute when errors occur. (Ulrich Pfeifer).
+    Fixed Ingperl.pm so that ingtest.pl runs without errors.
+
+v0.11     1997.10.30
+    Bug in Ingperl.pm &sql_fetch used $sth instead of $sql_sth - funny
+    that nobody noticed before now.
+
 v0.10     1997.10.07
     Release version - VMS does'nt work quite right, but it can muddle through.
     DBD::Test tests passed.
