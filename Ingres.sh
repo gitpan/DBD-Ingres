@@ -1,7 +1,7 @@
 #ifndef DBDIMP_H
 #define DBDIMP_H
 /*
-   $Id: Ingres.sh,v 1.4 1997/01/10 14:40:39 ht Exp $
+   $Id: Ingres.sh,v 1.6 1997/06/16 11:11:57 ht Exp $
 
    Copyright (c) 1994,1995  Tim Bunce
    Copyright (c) 1996,1997  Henrik Tougaard (ht@datani.dk)
@@ -29,6 +29,7 @@ struct imp_drh_st {
 struct imp_dbh_st {
     dbih_dbc_t com;         /* MUST be first element in structure   */
     int        session;     /* session id for this connection */
+    int        trim_blanks; /* if trailing blanks should be trimmed on selects */
 };
 
 /* Define sth implementor data structure */
@@ -40,6 +41,7 @@ struct imp_sth_st {
     int        st_num;      /* statement number */
     int        done_desc;   /* have we described this sth yet ?	*/
     int        fbh_num;     /* number of output fields		*/
+    int        trim_blanks; /* if trailing blanks should be trimmed */
     imp_fbh_t *fbh;	    /* array of imp_fbh_t structs	*/
 };
 
@@ -75,7 +77,7 @@ int	dbd_db_disconnect _((SV * dbh));
 void	dbd_db_destroy _((SV * dbh));
 int	dbd_db_STORE _((SV *dbh, SV *keysv, SV* valuesv));
 SV*	dbd_db_FETCH _((SV *dbh, SV *keysv));
-int	dbd_st_prepare _((SV * sth, char *staement));
+int	dbd_st_prepare _((SV * sth, char *statement));
 int     dbd_describe _((SV *h, imp_sth_t *imp_sth));
 int	dbd_st_execute _((SV *sth));
 AV*	dbd_st_fetchrow _((SV *sth));

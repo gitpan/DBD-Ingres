@@ -1,7 +1,7 @@
 #!/usr/local/bin/perl -sw
-# $Id: Makefile.PL,v 1.11 1997/04/23 09:14:17 ht Exp $
+# $Id: Makefile.PL,v 1.12 1997/06/16 11:11:57 ht Exp $
 
-require 5.003;
+require 5.003_93;
 
 use ExtUtils::MakeMaker 5.38, qw(&WriteMakefile $Verbose);
 use Getopt::Long;
@@ -15,7 +15,7 @@ require FileHandle unless defined(&FileHandle::new);
 # For those not using Dynamic loading this means building a
 # new static perl in the DBI directory by saying 'make perl'
 # and then using _that_ perl to make this one.
-use DBI 0.77;
+use DBI 0.82;
 
 my %opts = (
     NAME => 'DBD::Ingres',
@@ -95,8 +95,8 @@ if ($Config{osname} eq 'solaris') {
     $linkwith .= " -lelf";
 }
 
-# HP-UX 9 cannot link a non-PIC object file into a shared library.
-if ($Config{osname} eq 'hpux' and $Config{osvers} < 10) {
+# HP-UX cannot link a non-PIC object file into a shared library.
+if ($Config{osname} eq 'hpux') {
     print "Warning: forced to build static not dynamic on $Config{osname} $Config{osvers}\n";
     print "         See README for more information.\n";
     $opts{LINKTYPE} = 'static';

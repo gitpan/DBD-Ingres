@@ -1,5 +1,5 @@
 #
-# $Id: Ingperl.pm,v 1.11 1997/04/28 09:33:19 ht Exp $
+# $Id: Ingperl.pm,v 1.12 1997/06/16 11:11:57 ht Exp $
 #
 # Ingperl emulation interface for DBD::Ingres
 #
@@ -17,7 +17,7 @@ use DBI 0.73;
 use Exporter;
 use Carp;
 
-$VERSION = substr(q$Revision: 1.11 $, 10);
+$VERSION = substr(q$Revision: 1.12 $, 10);
 
 @ISA = qw(Exporter);
 
@@ -123,11 +123,13 @@ sub sql_fetch {
 	&sql_close();
 	return wantarray ? () : undef;
     }
-    return @row if wantarray;
-    carp "Multi-column row retrieved in scalar context, at"
-        if $sql_sth->{Warn};
-    return $row[0] if $sql_sth->{CompatMode};
-    @row;
+    if (wantarray) {
+        return @row;
+    } else { # wants a scalar
+        carp "Multi-column row retrieved in scalar context, at"
+            if $sql_sth->{Warn};
+        return $sql_sth->{CompatMode} ? $row[0] : @row;
+    }
 }
 
 sub sql {
@@ -158,11 +160,11 @@ sub sql {
 # @names = &sql_names;
 #
 
-sub sql_types       { $sql_sth ? @{$sql_sth->{'TYPE'}}     : undef; }
-sub sql_ingtypes    { $sql_sth ? @{$sql_sth->{'SqlType'}}  : undef; }
-sub sql_lengths     { $sql_sth ? @{$sql_sth->{'SqlLen'}}   : undef; }
-sub sql_nullable    { $sql_sth ? @{$sql_sth->{'NULLABLE'}} : undef; }
-sub sql_names       { $sql_sth ? @{$sql_sth->{'NAME'}}     : undef; }
+sub sql_types       { $sql_sth ? @{$sql_sth->{'ing_types'}}   : undef; }
+sub sql_ingtypes    { $sql_sth ? @{$sql_sth->{'ing_sqltypes'}}: undef; }
+sub sql_lengths     { $sql_sth ? @{$sql_sth->{'ing_lengths'}} : undef; }
+sub sql_nullable    { $sql_sth ? @{$sql_sth->{'NULLABLE'}}    : undef; }
+sub sql_names       { $sql_sth ? @{$sql_sth->{'NAME'}}        : undef; }
 
 # *----------------------------------------
 #
@@ -192,9 +194,9 @@ sub sql_eval_col1{
 	my $sth = $sql_dbh->prepare(@_);
 	return undef unless $sth;
 	$sth->execute or return undef;
-        my (@row, @col);
-	while (@row = $sth->fetchrow){
-		push(@col, $row[0]);
+        my ($row, @col);
+	while ($row = $sth->fetch){
+		push(@col, $row->[0]);
 	}
 	$sth->finish;			# close the cursor
 	undef $sth;

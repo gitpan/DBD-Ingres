@@ -1,3 +1,15 @@
+V0.0504   1997.06.16
+    Dropped { ing_trim_blanks } again as Tim Bunce has added it to DBI.
+    Now needs  DBI-0.82. (for this reason)
+    Expanded the pod (and adjusted it to reflect the new DBI-specs.
+    Tried to conform better to the DBI-spec.
+
+V0.05_03  1997.04.30
+    Added attribs on connect and prepare.
+       { ing_trim_blanks => 1 }
+    to cause trimming of trailing blanks.
+    The former change (from 0.05_01) is now reverted.
+
 V0.05_02 1997.04.29
     No changes. Just a number change as I can't upload the d... thing to
     PAUSE.

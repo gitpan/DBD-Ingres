@@ -1,5 +1,5 @@
 /*
-   $Id: Ingres.xs,v 1.6 1997/04/22 09:06:26 ht Exp $
+   $Id: Ingres.xs,v 1.8 1997/06/16 11:11:57 ht Exp $
 
    Copyright (c) 1994,1995  Tim Bunce
 
@@ -57,11 +57,12 @@ rows(h)
 
 MODULE = DBD::Ingres    PACKAGE = DBD::Ingres::dr
 
+# disconnect_all renamed and ALIAS'd to avoid length clash on VMS :-}
 void
-discon_all(drh)
-    SV *       drh
-    ALIAS:
-    disconnect_all = 1
+discon_all_(drh)
+    SV *        drh
+        ALIAS:
+        disconnect_all = 1
     CODE:
     if (!dirty && !SvTRUE(perl_get_sv("DBI::PERL_ENDING",0))) {
         D_imp_drh(drh);
@@ -305,8 +306,8 @@ DESTROY(sth)
 		SvPV(sth,na));
     }
     else {
-    if (DBIc_ACTIVE(imp_sth))
-        dbd_st_finish(sth);
+        if (DBIc_ACTIVE(imp_sth))
+            dbd_st_finish(sth);
         dbd_st_destroy(sth);
     }
 

@@ -34,10 +34,11 @@ BEFORE BUILDING, TESTING AND INSTALLING this you will need to:
     Build, test and install Perl 5.
     It is very important to test it and install it!
 
-*** NOTE: *** perl5 MUST BE INSTALLED TO VERSION 5.003 AT LEAST! ***
+*** NOTE: *** perl5 MUST BE INSTALLED TO VERSION 5.003_93 AT LEAST! ***
 
     Build, test and install the DBI module.
     It is very important to test it and install it!
+    *** DBI must be at least version 0.80 ***
 
 BUILDING
 

@@ -1,5 +1,5 @@
 /*
- * $Id: dbdimp.sc,v 1.9 1997/04/22 09:06:26 ht Exp $
+ * $Id: dbdimp.sc,v 1.11 1997/06/16 11:11:57 ht Exp $
  *
  * Copyright (c) 1994,1995  Tim Bunce
  *           (c) 1996,1997  Henrik Tougaard
@@ -85,7 +85,7 @@ dbd_init(dbistate)
     nxt_session = 1;
 }
 
-static U32* statement_numbers;   /* bitmask of reserved statement nos */
+static U32* statement_numbers;    /* bitmask of reserved statement nos */
 static int statement_max;         /* max bit number allocated (8 pr char) */
 
 void release_statement(num)
@@ -111,8 +111,8 @@ generate_statement_name(st_num)
     if (dbis->debug >= 4)
 	fprintf(DBILOGFP, "gen_st.nam");
     for (i=0; i<statement_max; i++) {
-        /* see if there is a free statement-name in the already allocated lump
-        */
+        /* see if there is a free statement-name
+           in the already allocated lump */
         int bit;
         if (dbis->debug >= 4)
 	    fprintf(DBILOGFP, " [%d]=%u", i, statement_numbers[i]);
@@ -372,7 +372,16 @@ dbd_db_FETCH(dbh, keysv)
     /* Default to caching results for DBI dispatch quick_FETCH  */
     int cacheit = TRUE;
 
-    if (1) {    /* no attribs defined yet       */
+    set_session(dbh);
+    if (kl==10 && strEQ(key, "AutoCommit")){
+        EXEC SQL BEGIN DECLARE SECTION;
+        int autocommit_state;
+        EXEC SQL END DECLARE SECTION;
+        
+	EXEC SQL SELECT(DBMSINFO("autocommit_state"))
+	    INTO :autocommit_state;
+	return newSViv((IV)autocommit_state);
+    } else {
         return Nullsv;
     }
     if (cacheit) { /* cache for next time (via DBI quick_FETCH) */
@@ -627,7 +636,8 @@ dbd_st_fetchrow(sth)
         	SvCUR(fbh->sv) = fbh->len;
         	SvPVX(fbh->sv)[fbh->len-1] = 0;
         	/* strip trailing blanks */
-        	if (!DBIc_COMPAT(imp_sth)) {
+        	if (fbh->origtype == IISQ_CHA_TYPE
+                 && DBIc_on(imp_sth,DBIcf_ChopBlanks)) {
         	    for (ch = fbh->len - 2;
         	         SvPVX(fbh->sv)[ch] == ' ';
         	         --ch)
@@ -727,7 +737,8 @@ dbd_st_FETCH(sth, keysv)
     int cacheit = TRUE;
 
     if (dbis->debug >= 3)
-        fprintf(DBILOGFP,"DBD::Ingres::dbd_st_FETCH(%s)->{%s}\n", imp_sth->name, key);
+        fprintf(DBILOGFP, "DBD::Ingres::dbd_st_FETCH(%s)->{%s}\n",
+                imp_sth->name, key);
 
     if (kl==10 && strEQ(key, "CursorName")) {
 	return newSVpv(imp_sth->name, 0);	
@@ -743,7 +754,8 @@ dbd_st_FETCH(sth, keysv)
 
     i = imp_sth->fbh_num;
 
-    if (kl==4 && strEQ(key, "TYPE")){
+    if (kl==8 && strEQ(key, "ing_type") ||
+        kl==4 && strEQ(key, "TYPE")){
         AV *av = newAV();
         retsv = newRV((SV*)av);
         while(--i >= 0)
@@ -753,22 +765,24 @@ dbd_st_FETCH(sth, keysv)
         retsv = newRV((SV*)av);
         while(--i >= 0)
             av_store(av, i, (imp_sth->fbh[i].nullable) ? &sv_yes : &sv_no);
-    } else if (kl==6 && strEQ(key, "SqlLen")){
-        AV *av = newAV();
-        retsv = newRV((SV*)av);
-        while(--i >= 0)
-            av_store(av, i, newSViv((IV)imp_sth->fbh[i].origlen));
-    } else if (kl==7 && strEQ(key, "SqlType")){
-        AV *av = newAV();
-        retsv = newRV((SV*)av);
-        while(--i >= 0)
-            av_store(av, i, newSViv((IV)imp_sth->fbh[i].origtype));
     } else if (kl==4 && strEQ(key, "NAME")){
         AV *av = newAV();
         retsv = newRV((SV*)av);
         while(--i >= 0)
             av_store(av, i, newSVpv(imp_sth->fbh[i].var->sqlname.sqlnamec,
                         imp_sth->fbh[i].var->sqlname.sqlnamel));
+    } else if (kl==11 && strEQ(key, "ing_lengths") ||
+               kl==6 && strEQ(key, "SqlLen")){
+        AV *av = newAV();
+        retsv = newRV((SV*)av);
+        while(--i >= 0)
+            av_store(av, i, newSViv((IV)imp_sth->fbh[i].origlen));
+    } else if ((kl==9 && strEQ(key, "ing_types")) ||
+               (kl==7 && strEQ(key, "SqlType")) ) {
+        AV *av = newAV();
+        retsv = newRV((SV*)av);
+        while(--i >= 0)
+            av_store(av, i, newSViv((IV)imp_sth->fbh[i].origtype));
     } else {
         return Nullsv;
     }

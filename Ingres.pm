@@ -1,4 +1,4 @@
-#   $Id: Ingres.pm,v 1.13 1997/04/29 06:38:13 ht Exp $
+#   $Id: Ingres.pm,v 1.17 1997/06/20 05:55:24 ht Exp $
 #
 #   Copyright (c) 1994,1995 Tim Bunce
 #             (c) 1996 Henrik Tougaard
@@ -6,7 +6,7 @@
 #   You may distribute under the terms of either the GNU General Public
 #   License or the Artistic License, as specified in the Perl README file.
 
-require 5.003;
+require 5.00390;
 
 =head1 NAME
 
@@ -34,10 +34,10 @@ DBD::Ingres - Ingres access interface for Perl5
     use DynaLoader ();
     @ISA = qw(DynaLoader);
 
-    $VERSION = '0.05_02';
-    my $Revision = substr(q$Revision: 1.13 $, 10);
+    $VERSION = '0.0504';
+    my $Revision = substr(q$Revision: 1.17 $, 10);
 
-    require_version DBI 0.73;
+    require_version DBI 0.82;
 
     bootstrap DBD::Ingres $VERSION;
 
@@ -81,10 +81,11 @@ DBD::Ingres - Ingres access interface for Perl5
         # create a 'blank' dbh
         my $this = DBI::_new_dbh($drh, {
             'Name' => $dbname,
-            'USER' => $user, 'CURRENT_USER' => $user,
+            'USER' => $user,
+            'CURRENT_USER' => $user,
             });
 
-        unless ($ENV{'II_SYSTEM'}){
+        unless ($ENV{'II_SYSTEM'}) {
             warn("II_SYSTEM not set. Ingres may fail\n")
             	if $drh->{Warn};
         }
@@ -120,7 +121,7 @@ DBD::Ingres - Ingres access interface for Perl5
     sub prepare {
         my($dbh, $statement, @attribs)= @_;
 
-        # create a 'blank' dbh
+        # create a 'blank' sth
         my $sth = DBI::_new_sth($dbh, {
             'Statement' => $statement,
             });
@@ -163,16 +164,25 @@ DBD::Ingres.
 
 =item Binding
 
-Parameter binding is not implented is this version of DBD::Ingres. It is planned
-for a future release - but does not have high priority. Any takers?
+Parameter binding is not implented is this version of DBD::Ingres. It is
+planned for a future release - but does not have high priority. Any
+takers?
 
 As there is no binding, there is no need for reexecution of statements -
 not that anything in the code prevents it - to my knowledge :-)
 
-=item $h-E<gt>state
+=item state
 
-SQL_STATE is not implemented yet. It is planned for the (not so) near
+    $h->state                (undef)
+
+SQLSTATE is not implemented yet. It is planned for the (not so) near
 future.
+
+=item ping
+
+    $dbh->ping;
+
+Not yet implemented - on the ToDo list.
 
 =item OpenIngres new features
 
@@ -188,17 +198,42 @@ Support will be added when the need arises - if you need it you add it ;-)
 
 =over 4
 
-=item $dbh-E<gt>do
+=item AutoCommit
 
-This is implemented as a call to 'EXECUTE IMMEDIATE'. (The generic way
-is through prepare, bind, execute).
-This will probably change when binds are added.
+    $dbh-E<gt>{AutoCommit}       ($)
 
-=item $sth-E<gt>{Statement}
+Defaults to B<OFF>. The DBI spec specifies that it should be ON, but the
+default mode for other Ingres tools is AutoCommit OFF and that should be
+followed here.
+
+Any objections?
+
+=item ChopBlanks
+
+    $h->{ChopBlanks}             ($)
+
+Defaults to !$h-E<gt>{CompatMode} (true normally, false for Ingperl
+emulation) - again not quite according to the DBI-spec, but doing the
+"right" thing for Ingres.
+
+=item do
+
+    $dbh-E<gt>do
+
+This is implemented as a call to 'EXECUTE IMMEDIATE' with all the
+limitations that this implies.
+
+This may change when binds are added.
+
+=item statement
+
+    $sth->{statement}             ($)
 
 Contains the text of the SQL-statement. Used mainly for debugging.
 
-=item $sth-E<gt>{TYPE}
+=item ing_types
+
+    $sth->{ing_types}              (\@)
 
 Returns an array of the "perl"-type of the return fields of a select
 statement.
@@ -211,9 +246,17 @@ The types are represented as:
 
 All integer types, ie. int1, int2 and int4.
 
+These values are returned as integers. This should not cause loss of
+precision as the internal Perl integer is at least 32 bit long.
+
 =item 'f': float
 
 The types float, float8 and money.
+
+These values are returned as floating-point numbers. This may cause loss
+of precision, but that would occur anyway whenever an application
+referred to the data (all Ingres tools fetch these values as
+floating-point numbers)
 
 =item 's': string
 
@@ -221,14 +264,18 @@ All other supported types, ie. char, varchar, text, date etc.
 
 =back
 
-=item $sth-E<gt>SqlLen
+=item ing_lengths
+
+    $sth->{ing_lengths}              (\@)
 
 Returns an array containing the lengths of the fields in Ingres, eg. an
 int2 will return 2, a varchar(7) 7 and so on.
 
 Note that money and date will have length returned as 0.
 
-=item $sth-E<gt>SqlType
+=item ing_types
+
+    $sth->{ing_sqltypes}              (\@)
 
 Returns an array containing the Ingres types of the fields. The types
 are given as documented in the Ingres SQL Reference Manual.
@@ -237,9 +284,7 @@ are given as documented in the Ingres SQL Reference Manual.
 
 =head1 NOTES
 
-I wonder if I have forgotten something? There is no authoritative DBI
-documentation (other than the code); it is difficult to document the
-differences from a non-existent document ;-}
+I wonder if I have forgotten something?
 
 =head1 SEE ALSO
 
