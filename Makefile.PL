@@ -1,5 +1,5 @@
 #!/usr/local/bin/perl -sw
-# $Id: Makefile.PL,v 2.101 1997/09/12 06:26:47 ht000 Exp $
+# $Id: Makefile.PL,v 2.102 1997/09/15 07:46:13 ht000 Exp $
 
 require 5.003_93;
 
@@ -74,8 +74,20 @@ for ($linkwith) {
    s{(/.*)/lib(.*?)\.a}{-L$1 -l$2};
 }
 
-# Try to figure out if this is an OPenIngres or not
+# Try to figure out if this is an OpenIngres or not
 my $OpenIngres = (-f "$II_SYSTEM/ingres/lib/libcompat.1.so");
+# Esql/C  - The Stupid Thing (tm) can't handle #ifdef properly
+# We have to do it ourselves here:
+print "\nUn-ifdef'fing OpenIngres in dbdimp.sc\n";
+open(ORIG, "<dbdimp.psc") or die "Can't open dbdimp.psc, $!";
+open(NEW, ">dbdimp.sc") or die "Can't open new dbdimp.sc, $!";
+while (defined (my $lin = <ORIG>)) {
+    $lin =~ s!/\*OI\*!! if $OpenIngres;
+    $lin =~ s!/\*64\*!! unless $OpenIngres;
+    print NEW $lin;
+}
+close(ORIG);
+close(NEW);
 
 my $linkopt = "";
 
@@ -119,7 +131,10 @@ print "System: perl$] @Config{qw(myuname)}\n",
 print "\n";
 
 $opts{LIBS} = [ "$libhome $linkwith" ];
-$opts{INC} = "-I\$(INSTALLSITEARCH)/auto/DBI -I\$(INSTALLSITEARCH)/DBI";
+
+my $DBI_PATH= $INC{"DBI.pm"};
+$DBI_PATH =~ s{/DBI.pm$}{/$Config::Config{archname}};
+$opts{INC} = "-I$DBI_PATH/auto/DBI";
 $opts{dynamic_lib} = { OTHERLDFLAGS => " $linkwith \$(COMPOBJS)" };
 $opts{OBJECT} = 'Ingres$(OBJ_EXT) dbdimp$(OBJ_EXT)';
 $opts{depend} = { "dbdimp\$(OBJ_EXT)" => "dbdimp.c Ingres.h",

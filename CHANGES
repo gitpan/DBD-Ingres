@@ -1,3 +1,7 @@
+v0.05_93  1997.09.15
+    Ulrich's patch for locating DBD::Ingres somewhere else than DBI added to
+    Makefile.PL.
+
 v0.05_92  1997.09.12 (early morning)
     Ulrich Pfeifer <Ulrich.Pfeifer@de.uu.net> has come up with a solution to my
     Makefile.PL problems with 'old' Ingres-versions. Thanks.

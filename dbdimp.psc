@@ -1,5 +1,5 @@
 /*
- * $Id: dbdimp.sc,v 2.102 1997/09/12 06:26:47 ht000 Exp $
+ * $Id: dbdimp.psc,v 2.103 1997/09/15 07:46:13 ht000 Exp $
  *
  * Copyright (c) 1994,1995  Tim Bunce
  *           (c) 1996,1997  Henrik Tougaard
@@ -243,14 +243,13 @@ dbd_db_login(dbh, dbname, user, pass)
         if (dbis->debug >= 3) fprintf(DBILOGFP, "    user='%s', opt='%s'\n",
                                 user, opt);
 	if (pass && *pass) {
-#ifdef OPENINGRES
-            EXEC SQL CONNECT :dbname SESSION :session
+/*OI*       EXEC SQL CONNECT :dbname SESSION :session
 		 IDENTIFIED BY :user DBMS_PASSWORD=:pass OPTIONS=:opt;
-#else
+/**/
             warn("non-OpenIngres: ignoring DBMS_PASSWORD");
-            EXEC SQL CONNECT :dbname SESSION :session
+/*64*       EXEC SQL CONNECT :dbname SESSION :session
 		 IDENTIFIED BY :user OPTIONS=:opt;
-#endif
+/**/
 	} else {
             EXEC SQL CONNECT :dbname SESSION :session
 		 IDENTIFIED BY :user OPTIONS=:opt;
