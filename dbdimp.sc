@@ -1,8 +1,8 @@
 /*
- * $Id: dbdimp.sc,v 1.8 1997/01/10 14:40:39 ht Exp $
+ * $Id: dbdimp.sc,v 1.9 1997/04/22 09:06:26 ht Exp $
  *
  * Copyright (c) 1994,1995  Tim Bunce
- *           (c) 1996 Henrik Tougaard
+ *           (c) 1996,1997  Henrik Tougaard
  *
  * You may distribute under the terms of either the GNU General Public
  * License or the Artistic License, as specified in the Perl README file.
@@ -22,6 +22,7 @@ EXEC SQL INCLUDE 'Ingres.sh';
 DBISTATE_DECLARE;
 static int cur_session;    /* the 'current' Ingres session_id */
 static int nxt_session;    /* the next 'available' session_id */
+
 int
 sql_check(h)
     SV * h;
@@ -60,27 +61,19 @@ error(h, error_num, text)
 }
 
 void
-set_session_db(h)
+set_session(h)
     SV * h;
 {
     D_imp_dbh(h);
     EXEC SQL BEGIN DECLARE SECTION;
     int session_id = imp_dbh->session;
     EXEC SQL END DECLARE SECTION;
-    if (dbis->debug >= 3)
-        fprintf(DBILOGFP, "set session_db(%d)\n", session_id);
     if (cur_session != session_id) {
+        if (dbis->debug >= 3)
+            fprintf(DBILOGFP, "set session_db(%d)\n", session_id);
         EXEC SQL SET_SQL(SESSION = :session_id);
  	cur_session = session_id;
     }
-}
-
-void
-set_session_st(h)
-    SV * h;
-{
-    D_imp_sth(h);
-    set_session_db(DBIc_PARENT_H(imp_sth));
 }
 
 void
@@ -250,7 +243,7 @@ dbd_db_do(dbh, statement, attribs, params)
 
     if (dbis->debug >= 2)
         fprintf(DBILOGFP,"DBD::Ingres::dbd_db_do(\"%s\")\n", statement);
-    set_session_db(dbh);
+    set_session(dbh);
     
     EXEC SQL EXECUTE IMMEDIATE :statement;
     if (!sql_check(dbh)) return -1;
@@ -266,7 +259,7 @@ dbd_db_commit(dbh)
     if (dbis->debug >= 2)
         fprintf(DBILOGFP,"DBD::Ingres::dbd_db_commit\n");
 
-    set_session_db(dbh);
+    set_session(dbh);
     EXEC SQL COMMIT;
     return sql_check(dbh);
 }
@@ -280,7 +273,7 @@ dbd_db_rollback(dbh)
     if (dbis->debug >= 2)
         fprintf(DBILOGFP,"DBD::Ingres::dbd_db_rollback\n");
 
-    set_session_db(dbh);
+    set_session(dbh);
     EXEC SQL ROLLBACK;
     return sql_check(dbh);
 }
@@ -298,7 +291,7 @@ dbd_db_disconnect(dbh)
     if (dbis->debug >= 2)
         fprintf(DBILOGFP,"DBD::Ingres::dbd_db_disconnect\n");
 
-    set_session_db(dbh);
+    set_session(dbh);
     EXEC SQL INQUIRE_INGRES(:transaction_active = TRANSACTION);
     if (transaction_active == 1){
         warn("Ingres: You should commit or rollback before disconnect.");
@@ -345,7 +338,7 @@ dbd_db_STORE(dbh, keysv, valuesv)
     SV *cachesv = NULL;
     int on = SvTRUE(valuesv);
 
-    set_session_db(dbh);
+    set_session(dbh);
     if (kl==10 && strEQ(key, "AutoCommit")){
         if (on) {
             EXEC SQL SET AUTOCOMMIT ON;
@@ -419,7 +412,7 @@ dbd_st_prepare(sth, statement)
             "DBD::Ingres::dbd_st_prepare statement('%s') name is %s, sqlda: %p\n",
             statement, name, sqlda);
 
-    set_session_st(sth);
+    set_session(DBIc_PARENT_H(imp_sth));
     EXEC SQL PREPARE :name INTO sqlda FROM :statement;
     if (!sql_check(sth)) return 0;
 
@@ -552,7 +545,7 @@ dbd_st_execute(sth)	/* <=0 is error, >0 is ok */
     }
 
     /* Trigger execution of the statement			*/
-    set_session_st(sth);
+    set_session(DBIc_PARENT_H(imp_sth));
     if (imp_sth->fbh_num == 0) {
         /* non-select statement: just execute it */
         if (dbis->debug >= 2)
@@ -593,7 +586,7 @@ dbd_st_fetchrow(sth)
         error(sth, -7, "fetch without open cursor");
         return Nullav;
     }
-    set_session_st(sth);
+    set_session(DBIc_PARENT_H(imp_sth));
     sqlda = &imp_sth->sqlda;
     EXEC SQL FETCH :name USING DESCRIPTOR :sqlda;
     if (sqlca.sqlcode == 100) {
@@ -611,6 +604,7 @@ dbd_st_fetchrow(sth)
     for(i=0; i < num_fields; ++i) {
         imp_fbh_t *fbh = &imp_sth->fbh[i];
         IISQLVAR *var = fbh->var;
+        int ch;
         SV *sv = AvARRAY(av)[i]; /* Note: we (re)use the SV in the AV	*/
         if (dbis->debug >= 3) fprintf(DBILOGFP, "    Field #%d: ", i);
         if (fbh->indic == -1) {
@@ -632,6 +626,13 @@ dbd_st_fetchrow(sth)
             case 's':
         	SvCUR(fbh->sv) = fbh->len;
         	SvPVX(fbh->sv)[fbh->len-1] = 0;
+        	/* strip trailing blanks */
+        	if (!DBIc_COMPAT(imp_sth)) {
+        	    for (ch = fbh->len - 2;
+        	         SvPVX(fbh->sv)[ch] == ' ';
+        	         --ch)
+        	             SvPVX(fbh->sv)[ch] = 0;
+        	}
 	        sv_setsv(sv, fbh->sv);
 	        SvCUR(sv) = strlen(SvPVX(sv));
                 if (dbis->debug >= 3)
@@ -661,7 +662,7 @@ dbd_st_finish(sth)
         if (dbis->debug >= 3)
             fprintf(DBILOGFP,"DBD::Ingres::dbd_st_finish(%s)\n",
                 imp_sth->name);
-        set_session_st(sth);
+        set_session(DBIc_PARENT_H(imp_sth));
         EXEC SQL CLOSE :name;
     }
     DBIc_ACTIVE_off(imp_sth);
@@ -728,8 +729,16 @@ dbd_st_FETCH(sth, keysv)
     if (dbis->debug >= 3)
         fprintf(DBILOGFP,"DBD::Ingres::dbd_st_FETCH(%s)->{%s}\n", imp_sth->name, key);
 
+    if (kl==10 && strEQ(key, "CursorName")) {
+	return newSVpv(imp_sth->name, 0);	
+    }
+
     if (!imp_sth->done_desc && !dbd_describe(sth, imp_sth)) {
-        return Nullsv;  /* dbd_describe called sql_check()       */
+        /* dbd_describe called sql_check()       */
+	/* we can't return Nullsv here because the xs code will	*/
+	/* then just pass the attribute name to DBI for FETCH.	*/
+	croak("Describe failed during %s->FETCH(%s)",
+		SvPV(sth, na), key);
     }
 
     i = imp_sth->fbh_num;

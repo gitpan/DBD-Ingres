@@ -1,7 +1,37 @@
+V0.05_02 1997.04.29
+    No changes. Just a number change as I can't upload the d... thing to
+    PAUSE.
+
+V0.05_01 1997.04.16
+
+    Check on II_SYSTEM moved to connect (was at compile-time).
+
+    Improved library dectection for OpenIngres without installed ABF
+    component.
+    
+    Improved Ingperl emulation (Ronald B. Irvin <rbirvin@usgs.gov>):
+        - &sql_fetch into scalar now returns first column of output
+          and warns if $sql_sth->{Warn} is true.
+        - Warnings from &sql_close without open cursor are now only
+          output if requested (uses $sql_sth->{Warn}).
+        - &sql_eval_col1 fixed.
+
+    Now known to work on DG-UX (Ronald B. Irvin <rbirvin@usgs.gov>).
+    
+    Fetch(row) truncates trailing blanks from text-columns. This feature
+    can be disabled by setting $sth->{CompatMode} true. I was tired of
+    writing C<VARCHAR(column)> or C<$col=~S/\+$//;> all over the place!
+    WARNING: this may change old (DBD) code!!!
+    Ingperl sets CompatMode so Ingperl scripts are not affected.
+
+    Many other cleanups and buglet fixes.
+
 V0.05	1997.03.20
 	Makefile.PL changed so that it can link OpenIngres.
+
 	Support for HP-UX added (thanks to Gil Hirsch <gilh@cpm.telrad.co.il>
 	and Tim Bunce <Tim.Bunce@ig.co.uk>)
+
 	Added support for DBI 0.77
 	
 V0.04	1997.01.17

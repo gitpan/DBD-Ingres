@@ -1,5 +1,5 @@
 #!/usr/local/bin/perl -sw
-# $Id: Makefile.PL,v 1.9 1997/03/20 08:49:19 ht Exp $
+# $Id: Makefile.PL,v 1.11 1997/04/23 09:14:17 ht Exp $
 
 require 5.003;
 
@@ -15,7 +15,7 @@ require FileHandle unless defined(&FileHandle::new);
 # For those not using Dynamic loading this means building a
 # new static perl in the DBI directory by saying 'make perl'
 # and then using _that_ perl to make this one.
-use DBI 0.73;
+use DBI 0.77;
 
 my %opts = (
     NAME => 'DBD::Ingres',
@@ -39,10 +39,9 @@ $Verbose ||= $::opt_v;
 # --- Introduction
 
 print "\n Configuring DBD::Ingres ...
->>>\tRemember to actually *READ* the README file!
-   \tEspecially if you have any problems.
 
-   \tTry also 'perl Makefile.PL -v'
+   \tTry 'perl Makefile.PL -v'
+   \t  if you have any problems.
 
 
 ";
@@ -67,6 +66,8 @@ if (-f "$II/ingres/files/abflnk.opt") {
     close ABFLNK;
     $linkwith =~ s/\n//g;
     $linkwith =~ s/\$II_SYSTEM/$II/g;
+} elsif (-f "$II/ingres/lib/lcompat.1.so") {
+    $linkwith .= " -lcompat.1";   # OpenIngres without ABF.
 }
 my $linkopt = "";
 

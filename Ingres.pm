@@ -1,4 +1,4 @@
-#   $Id: Ingres.pm,v 1.11 1997/03/20 08:49:19 ht Exp $
+#   $Id: Ingres.pm,v 1.13 1997/04/29 06:38:13 ht Exp $
 #
 #   Copyright (c) 1994,1995 Tim Bunce
 #             (c) 1996 Henrik Tougaard
@@ -8,6 +8,25 @@
 
 require 5.003;
 
+=head1 NAME
+
+DBD::Ingres - Ingres access interface for Perl5
+
+=head1 SYNOPSIS
+
+    $dbh = DBI->connect($dbname, $user, $options, 'Ingres')
+    $sth = $dbh->prepare($statement)
+    $sth->execute
+    @row = $sth->fetchrow
+    $sth->finish
+    $dbh->commit
+    $dbh->rollback
+    $dbh->disconnect
+    and many more
+
+=cut
+
+# The POD text continues at the end of the file.
 {
     package DBD::Ingres;
 
@@ -15,8 +34,8 @@ require 5.003;
     use DynaLoader ();
     @ISA = qw(DynaLoader);
 
-    $VERSION = '0.05';
-    my $Revision = substr(q$Revision: 1.11 $, 10);
+    $VERSION = '0.05_02';
+    my $Revision = substr(q$Revision: 1.13 $, 10);
 
     require_version DBI 0.73;
 
@@ -29,10 +48,6 @@ require 5.003;
     sub driver{
         return $drh if $drh;
         my($class, $attr) = @_;
-
-        unless ($ENV{'II_SYSTEM'}){
-            warn("II_SYSTEM not set. Ingres will fail\n");
-        }
 
         $class .= "::dr";
 
@@ -68,6 +83,11 @@ require 5.003;
             'Name' => $dbname,
             'USER' => $user, 'CURRENT_USER' => $user,
             });
+
+        unless ($ENV{'II_SYSTEM'}){
+            warn("II_SYSTEM not set. Ingres may fail\n")
+            	if $drh->{Warn};
+        }
 
         # Connect to the database..
         DBD::Ingres::db::_login($this, $dbname, $user, $auth)
@@ -128,22 +148,6 @@ require 5.003;
 
 1;
 
-=head1 NAME
-
-DBD::Ingres - Ingres access interface for Perl5
-
-=head1 SYNOPSIS
-
-    $dbh = DBI->connect($dbname, $user, $options, 'Ingres')
-    $sth = $dbh->prepare($statement)
-    $sth->execute
-    @row = $sth->fetchrow
-    $sth->finish
-    $dbh->commit
-    $dbh->rollback
-    $dbh->disconnect
-    and many more
-
 =head1 DESCRIPTION
 
 DBD::Ingres is an extension to Perl which allows access to Ingres
@@ -159,11 +163,16 @@ DBD::Ingres.
 
 =item Binding
 
-Binding is not implented is this version of DBD::Ingres. It is planned
+Parameter binding is not implented is this version of DBD::Ingres. It is planned
 for a future release - but does not have high priority. Any takers?
 
 As there is no binding, there is no need for reexecution of statements -
 not that anything in the code prevents it - to my knowledge :-)
+
+=item $h-E<gt>state
+
+SQL_STATE is not implemented yet. It is planned for the (not so) near
+future.
 
 =item OpenIngres new features
 
@@ -179,13 +188,17 @@ Support will be added when the need arises - if you need it you add it ;-)
 
 =over 4
 
-=item $dbh->do
+=item $dbh-E<gt>do
 
 This is implemented as a call to 'EXECUTE IMMEDIATE'. (The generic way
 is through prepare, bind, execute).
 This will probably change when binds are added.
 
-=item $sth->TYPE
+=item $sth-E<gt>{Statement}
+
+Contains the text of the SQL-statement. Used mainly for debugging.
+
+=item $sth-E<gt>{TYPE}
 
 Returns an array of the "perl"-type of the return fields of a select
 statement.
@@ -208,12 +221,14 @@ All other supported types, ie. char, varchar, text, date etc.
 
 =back
 
-=item $sth->SqlLen
+=item $sth-E<gt>SqlLen
 
 Returns an array containing the lengths of the fields in Ingres, eg. an
 int2 will return 2, a varchar(7) 7 and so on.
 
-=item $sth->SqlType
+Note that money and date will have length returned as 0.
+
+=item $sth-E<gt>SqlType
 
 Returns an array containing the Ingres types of the fields. The types
 are given as documented in the Ingres SQL Reference Manual.

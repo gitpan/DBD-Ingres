@@ -1,5 +1,5 @@
 /*
-   $Id: Ingres.xs,v 1.5 1997/01/15 08:14:19 ht Exp $
+   $Id: Ingres.xs,v 1.6 1997/04/22 09:06:26 ht Exp $
 
    Copyright (c) 1994,1995  Tim Bunce
 
@@ -17,6 +17,9 @@ DBISTATE_DECLARE;
 
 
 MODULE = DBD::Ingres    PACKAGE = DBD::Ingres
+
+REQUIRE:    1.929
+PROTOTYPES: DISABLE
 
 BOOT:
     items = 0;  /* avoid 'unused variable' warning */
@@ -69,6 +72,10 @@ discon_all(drh)
                 DBIc_ERR(imp_drh), DBIc_ERRSTR(imp_drh));
         XSRETURN(0);
     }
+    /* perl_destruct with perl_destruct_level and $SIG{__WARN__} set	*/
+    /* to a code ref core dumps when sv_2cv triggers warn loop.		*/
+    if (perl_destruct_level)
+	perl_destruct_level = 0;
     XST_mIV(0, 1);
 
 
@@ -106,12 +113,26 @@ void
 commit(dbh)
     SV *        dbh
     CODE:
+    D_imp_dbh(dbh);
+    /* Check for commit() being called whilst refs to cursors	*/
+    /* still exists. This needs some more thought.			*/
+    if (DBIc_ACTIVE_KIDS(imp_dbh) && DBIc_WARN(imp_dbh) && !dirty) {
+	warn("commit(%s) invalidates %d active cursor(s)",
+	    SvPV(dbh,na), (int)DBIc_ACTIVE_KIDS(imp_dbh));
+    }
     ST(0) = dbd_db_commit(dbh) ? &sv_yes : &sv_no;
 
 void
 rollback(dbh)
-    SV *        dbh
+    SV *       dbh
     CODE:
+    D_imp_dbh(dbh);
+    /* Check for rollback() being called whilst refs to cursors	*/
+    /* still exists. This needs some more thought.			*/
+    if (DBIc_ACTIVE_KIDS(imp_dbh) && DBIc_WARN(imp_dbh) && !dirty) {
+	warn("rollback(%s) invalidates %d active cursor(s)",
+	    SvPV(dbh,na), (int)DBIc_ACTIVE_KIDS(imp_dbh));
+    }
     ST(0) = dbd_db_rollback(dbh) ? &sv_yes : &sv_no;
 
 

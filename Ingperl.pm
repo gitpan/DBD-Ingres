@@ -1,5 +1,5 @@
 #
-# $Id: Ingperl.pm,v 1.7 1997/01/15 07:53:10 ht Exp $
+# $Id: Ingperl.pm,v 1.11 1997/04/28 09:33:19 ht Exp $
 #
 # Ingperl emulation interface for DBD::Ingres
 #
@@ -17,7 +17,7 @@ use DBI 0.73;
 use Exporter;
 use Carp;
 
-$VERSION = substr(q$Revision: 1.7 $, 10);
+$VERSION = substr(q$Revision: 1.11 $, 10);
 
 @ISA = qw(Exporter);
 
@@ -30,26 +30,22 @@ $VERSION = substr(q$Revision: 1.7 $, 10);
     &sql_eval_row1 &sql_eval_col1
 );
 
-$debug    = 0 unless defined $debug;
-$debugdbi = 0;
-
-if ($debugdbi){
-    my $sw = DBI->internal;
-    $sw->debug($debugdbi);
-    print "Switch: $sw->{Attribution}, $sw->{Version}\n";
-    $sw->{DebugDispatch} = $debugdbi;
-}
-
-
 use strict;
-use vars (qw[$sql_drh $sql_dbh $sql_sth $debug]);
+use vars (qw[$sql_drh $sql_dbh $sql_sth $sql_debug]);
+
+$sql_debug    = 0 unless defined $sql_debug;
+
+if ($sql_debug){
+    my $sw = DBI->internal;
+    print "Switch: $sw->{Attribution}, $sw->{Version}\n";
+}
 
 # Install Driver
 $sql_drh = DBI->install_driver('Ingres');
 if ($sql_drh) {
-	print "DBD::Ingres driver installed as $sql_drh\n" if $debug;
-	$sql_drh->debug($debug);
-	$sql_drh->{Warn}       = 0;
+    print "DBD::Ingres driver installed as $sql_drh\n" if $sql_debug;
+    $sql_drh->{Warn}       = 0;
+    $sql_drh->{CompatMode} = 1;
 }
 
 
@@ -64,65 +60,73 @@ if ($sql_drh) {
 sub sql_exec {
     my($statement) = @_;
     # decide what this is...
-    warn "sql_exec('$statement')\n" if $Ingperl::debug;
+    warn "sql_exec('$statement')\n" if $sql_debug;
     if ($statement =~ /^\s*connect\b/i) {
         # connect to the database;
-        croak "Already connected to database" if $sql_dbh;
+        croak "Already connected to database, at" if $sql_dbh;
         my($database, $user, $option);
         # this contain the database name and possibly
         # a username
         # find database
-        ($database) = $statement =~ /connect\s+([\w:]+)/;
+        ($database) = $statement =~ /connect\s+([\w:]+)/i;
         my $rest = $';  #possibly contains username... and other options
-        if ($rest =~ /identified\s+by\s+(\w+)/) {
+        if ($rest =~ /identified\s+by\s+(\w+)/i) {
             $user = $1;
-            $option = "$`$'"; # every thing else..
+            $option = "$` $'"; # every thing else..
         } elsif ($rest =~ /-u(\w+)/) {
             $user = $1;
-            $option = "$`$'"; # every thing else..
+            $option = "$` $'"; # every thing else..
         } else {
             $user = ""; # noone;
             $option = $rest
         }
         warn "Ingperl connecting to database '$database' as user '$user'\n"
-            if $Ingperl::debug;
+            if $sql_debug;
 	$option =~ s/^\s+//;
         $sql_dbh = $Ingperl::sql_drh->connect($database, $user, $option);
-    }
-    elsif ($statement =~ /^\s*disconnect\b/i) {
-        croak "Ingperl: Not connected to database" unless $sql_dbh;
-        $sql_dbh->disconnect();
-        undef $sql_dbh;
-    }
-    elsif ($statement =~ /^\s*commit\b/i) {
-        croak "Ingperl: Not connected to database" unless $sql_dbh;
-        $sql_dbh->commit();
-    }
-    elsif ($statement =~ /^\s*rollback\b/i) {
-        croak "Ingperl: Not connected to database" unless $sql_dbh;
-        $sql_dbh->rollback();
-    }
-    else {
-        # This is something else. Just execute the statement
-        croak "Ingperl: Not connected to database" unless $sql_dbh;
-        $sql_dbh->do($statement);
+    } else {
+        croak "Ingperl: Not connected to database, at" unless $sql_dbh;
+
+	if ($statement =~ /^\s*disconnect\b/i) {
+            $sql_dbh->disconnect();
+            undef $sql_dbh;
+    	}
+    	elsif ($statement =~ /^\s*commit\b/i) {
+            $sql_dbh->commit();
+        }
+	elsif ($statement =~ /^\s*rollback\b/i) {
+            $sql_dbh->rollback();
+        }
+        else {
+            # This is something else. Just execute the statement
+           $sql_dbh->do($statement);
+        }
     }
 }
 
 sub sql_close {
-	if ($sql_sth) {
-	    $sql_sth->finish;
-	    undef $sql_sth;
-	    1;
-	} else {
-	    carp "Ingperl: close with no open cursor" unless $sql_sth;
-	}
+    if ($sql_sth) {
+        $sql_sth->finish;
+        undef $sql_sth;
+        1;
+    } else {
+        carp "Ingperl: close with no open cursor, at"
+            if $sql_drh->{Warn};
+        1;
+    }
 }
 
 sub sql_fetch {
-    croak "Ingperl: No active cursor\n" unless $sql_sth;
+    croak "Ingperl: No active cursor, at" unless $sql_sth;
     my(@row) = $sql_sth->fetchrow();
-    &sql_close() unless @row;
+    unless (@row) {
+	&sql_close();
+	return wantarray ? () : undef;
+    }
+    return @row if wantarray;
+    carp "Multi-column row retrieved in scalar context, at"
+        if $sql_sth->{Warn};
+    return $row[0] if $sql_sth->{CompatMode};
     @row;
 }
 
@@ -133,8 +137,9 @@ sub sql {
     }
     elsif ($statement =~ /^\s*select\b/i) {
         if ($sql_sth) {
-            warn "IngPerl: Select while another select active\n".
-                 "         Closing previous select: $sql_sth\n" if $Ingperl::debug;
+            warn "IngPerl: Select while another select active - closing".
+            	" previous select, at"
+                    if $sql_debug or $sql_sth->{Warn};
             $sql_sth->finish();
         }
         $sql_sth = $sql_dbh->prepare($statement) or return undef;
@@ -168,7 +173,6 @@ tie $Ingperl::sql_version,   'Ingperl::var', 'version';
 *sql_rowcount = \$DBI::rows;
 $Ingperl::sql_readonly = 1;
 $Ingperl::sql_showerrors = 0;
-$Ingperl::sql_debug = 0;
 
 # *----------------------------------------
 #
@@ -189,7 +193,7 @@ sub sql_eval_col1{
 	return undef unless $sth;
 	$sth->execute or return undef;
         my (@row, @col);
-	while (@row = &sql_fetch){
+	while (@row = $sth->fetchrow){
 		push(@col, $row[0]);
 	}
 	$sth->finish;			# close the cursor
@@ -224,7 +228,10 @@ sub FETCH {
 }
 
 sub STORE {
-    carp "Can't modify ${$_[0]} special variable"
+    my ($self, $value) = shift;
+    confess "wrong type" unless ref $self;
+    croak "too many arguments" if @_;
+    carp "Can't modify ${$self} special variable, at"
 }
 
 1;
@@ -270,9 +277,10 @@ All functions return false or undefined (in the Perl sense)
 to indicate failure.
 
 The text in this document is largely unchanged from the original Perl4
-ingperl documentation written by Tim Bunce (timbo@ig.co.uk).  Any
-comments specific to the DBD::Ingres Ingperl emulation are prefixed by
-B<DBD:>.
+ingperl documentation written by Tim Bunce (timbo@ig.co.uk).
+
+Any comments specific to the DBD::Ingres Ingperl emulation are prefixed
+by B<DBD:>.
 
 =head2 IngPerl Functions
 
@@ -301,6 +309,11 @@ For example:
 
 Returns true else undef on error.
 
+B<DBD:> Note that the options B<must> be given in the order
+C<database-name username other-options> otherwise the check for username
+wil fail. It is a rather simple scan of the option-string. Further
+improvements are welcome.
+
 =item disconnect from a database:
 
     &sql("disconnect");
@@ -309,12 +322,19 @@ Note that ingperl will complain if a transaction is active.
 
 You should &sql_exec 'commit' or 'rollback' before disconnect.
 
+B<DBD:> The warning on disconnect has another wording now:
+	Ingres: You should commit or rollback before disconnect.
+        Ingres: Any outstanding changes have been rolledback.
+B<DBD:> Please note the C<rollback>.
+
 Returns true else undef on error (unlikely!).
 
-Note that an ingres bug means that $sql_error will contain an
-error message (E_LQ002E query issued outside of a session) even
-though the disconnect worked ok.
-B<DBD:> I<Must check if this is still the case...>
+Note that an ingres bug means that $sql_error will contain an error
+message (E_LQ002E query issued outside of a session) even though the
+disconnect worked ok.
+
+B<DBD:> I<Must check if this is still the case.> Don't think so
+though...
 
 =item prepare a statement:
 
@@ -348,7 +368,7 @@ hands off all non-select statements to C<&sql_exec>.
 
 =back
 
-item * sql_exec
+=item * sql_exec
 
     &sql_exec('...');
 
@@ -392,24 +412,46 @@ For example:
 
 Null values are returned as undef elements of the array.
 
-B<DBD:> C<&sql_fetch> can also be expressed as either
-C<&sql("fetch")> or C<&sql_exec("fetch")> - to cater for
-Ingperl 1.0 scripts!
+B<DBD:> C<&sql_fetch> can also be expressed as either C<&sql("fetch")>
+or C<&sql_exec("fetch")> - to cater for Ingperl 1.0 scripts!
+
+B<DBD:> C<&sql_fetch> will call C<&sql_close> when the last row of data
+has been fetched. This has been the way it was supposed to be...
+
+B<DBD:> C<&sql_fetch> will die with the error C<Ingperl: No active
+cursor> if an error has occured in the C<&sql(select..)>-statement.
+
+B<DBD:> C<$scalar = &sql_fetch> returns the first column of data if
+C<$sql_sth-E<gt>{CompatMode}> is set; this is the default mode for
+Ingperl and is the expected behaviour for Perl4. In Perl5 (and with 
+C<$sql_sth-E<gt>{CompatMode}> unset) the number of columns will be
+returned. The warning C<Multi-column row retrieved in scalar context>
+is given if C<$sql_sth-E<gt>{Warn}> is true.
+
+B<DBD:> Text columns are returned with trailing blanks if
+C<$sql_sth-E<gt>{CompatMode}> is set. Otherwise the trailings
+blanks are stripped.
+The default for C<Ingperl> is to have C<$sql_sth-E<gt>{CompatMode}>
+set.
 
 =item * sql_close
 
     &sql_close;
 
-This function needs to be called *only* if you do not use
-C<&sql_fetch> to fetch *all* the records *and* you wish to close
-the cursor as soon as possible (to release locks etc).
-Otherwise ignore it. Always returns true.
+This function needs to be called B<only> if you do not use C<&sql_fetch>
+to fetch B<all> the records B<and> you wish to close the cursor as soon as
+possible (to release locks etc). Otherwise ignore it. Always returns
+true.
+
+B<DBD:> If C<$sql_sth-E<gt>{Warn}> is false the warning C<Ingperl: close
+with no open cursor> will be given whenever a closed cursor is reclosed.
+The default behaviour is to omit the warning.
 
 =back
 
-IngPerl Functions to describe the currently prepared statement.
-These functions all return an array with one element for each
-field in the query result.
+IngPerl Functions to describe the currently prepared statement. These
+functions all return an array with one element for each field in the
+query result.
 
 =over 4
 
@@ -418,7 +460,10 @@ field in the query result.
     @types = &sql_types;
 
 Returns a list of sprintf type letters to indicate the generic
-type if each field: 'd' (int), 'f' (float), or 's' (string).
+type of each field:
+      d - int
+      f - float
+      s - string
 
 =item * sql_ingtypes
 
@@ -437,16 +482,23 @@ Returns a list of specific ingres type numbers:
     @lengths = &sql_lengths;
 
 Returns a list if ingres data type lengths.
+
 For strings the length is the maximum width of the field.
-For numbers it is the number of bytes used to store the
-binary representation of the value, 1, 2, 4 or 8.
+
+For numbers it is the number of bytes used to store the binary
+representation of the value, 1, 2, 4 or 8.
+
+For date and money fields it is 0.
+
+B<DBD:> This was not documented in the Ingperl documentation, but is, as
+far as I can discover, how it used to work.
 
 =item * sql_nullable
 
     @nullable = &sql_nullable;
 
-Returns a list of boolean values (0 or 1's). A 1 indicates
-that the corresponding field may return a null value.
+Returns a list of boolean values (0 or 1's). A 1 indicates that the
+corresponding field may return a null value.
 
 =item * sql_names
 
@@ -474,9 +526,9 @@ Ingperl version and the DBD::Ingres version.
 
 =item * $sql_error (read only)
 
-Contains the error message text of the current ingres error.
+Contains the error message text of the current Ingres error.
 
-Is empty if last statement succedded.
+Is empty if last statement succeeded.
 
 For example:
     print "$sql_error\n" if $sql_error;
@@ -486,24 +538,23 @@ For example:
 The current value of sqlda.sqlcode. Only of interest in more
 sophisticated applications.
 
-Typically 0, <0 on error,
-100=no more rows, 700=message, 710=dbevent.
+Typically 0, <0 on error, 100=no more rows, 700=message, 710=dbevent.
 
 =item * $sql_rowcount (read only)
 
-After a successful Insert, Delete, Update, Select, Modify,
-Create Index, Create Table As Select or Copy this variable
-holds the number of rows affected.
+After a successful Insert, Delete, Update, Select, Modify, Create Index,
+Create Table As Select or Copy this variable holds the number of rows
+affected.
 
 =item * $sql_readonly (default 1)
 
-If true then prepared sql statements are given read only cursors
-this is generally a considerable performance gain.
+If true then prepared sql statements are given read only cursors this is
+generally a considerable performance gain.
 
 B<DBD:> Not implemented. All cursors are readonly - there is no way to
 modify the value of a cursor element, therefore no reason not to make
-the cursors readonly. The value of this variable was ignored already
-in Ingperl 2.0.
+the cursors readonly. The value of this variable was ignored already in
+Ingperl 2.0.
 
 =item * $sql_showerrors (default 0)
 
@@ -517,14 +568,15 @@ B<DBD:> Not yet implemented. (Does anybody need it?)
 If ingperl has been compiled with -DINGPERL_DEBUG then setting this
 variable true will enable debugging messages from ingperl internals.
 
-B<DBD:> Not implemented. Setting the variable C<$debugdbi> to 3
-or greater results in debug information from DBI and DBD::Ingres
+B<DBD:> Setting this variable will enable debugging from the Ingperl
+emulation layer. Setting the variable C<$DBI::dbi_debug> enables debug output
+from the C<DBI> and C<DBD> layers (the value 3 will result in large
+amounts of output including internal debug of C<DBD::Ingres>).
 
 =item * $sql_drh
 
 B<DBD:> This variable is the DBI-internal driver handle for the
-DBD::Ingres driver. It is of little or no use at present especially as
-there is no provision for multiple connects yet).
+DBD::Ingres driver. This is rarely used!
 
 =item * $sql_dbh
 
@@ -538,7 +590,7 @@ B<DBD:> This is the DBI statement handle for the current SELECT-statement
 
 =back
 
-IngPerl Library Functions
+=head2 IngPerl Library Functions
 
 =over 4
 
@@ -548,46 +600,50 @@ IngPerl Library Functions
 
 Execute a select statement and return the first row.
 
+B<DBD:> This is executed in a separate cursor and can therefore be
+executed while a &sql_fetch-loop is in progres.
+
 =item * sql_eval_col1
 
     @col1 = &sql_eval_col1('select ...');
 
 Execute a select statement and return the first column.
 
+B<DBD:> As &sql_eval_col1 this is executed in a separate cursor.
+
 =head1 NOTES
 
 The DBD::Ingres module has been modelled closely on Tim Bunce's
-DBD::Oracle module and warnings that apply to DBD::Oracle and
-the Oraperl emulation interface may also apply to the Ingperl
-emulation interface.
+DBD::Oracle module and warnings that apply to DBD::Oracle and the
+Oraperl emulation interface may also apply to the Ingperl emulation
+interface.
 
 Your mileage may vary.
 
 =head1 WARNINGS
 
+IngPerl comes with no warranty - it works for me - it may not work for
+you. If it trashes your database I am not responsible!
 
-IngPerl comes with no warranty - it works for me - it may not
-work for you. If it trashes your database I am not responsible!
-
-This file should be included in all applications using ingperl
-in order to help ensure that scripts will remain compatible with
-new releases of ingperl.
+This file should be included in all applications using ingperl in order
+to help ensure that scripts will remain compatible with new releases of
+ingperl.
 
 B<DBD:> The following warning is taken (almost) verbatim from the
 oraperl emulation module, but is also valid for Ingres.
 
 The Ingperl emulation software shares no code with the original ingperl.
-It is built on top the the new Perl5 DBI and DBD::Ingres
-modules. These modules are still evolving. (One of the goals of
-the Ingperl emulation software is to allow useful work to be done
-with the DBI and DBD::Ingres modules whilst insulation users from
-the ongoing changes in their interfaces.)
+It is built on top the the new Perl5 DBI and DBD::Ingres modules. These
+modules are still evolving. (One of the goals of the Ingperl emulation
+software is to allow useful work to be done with the DBI and DBD::Ingres
+modules whilst insulation users from the ongoing changes in their
+interfaces.)
 
 It is quite possible, indeed probable, that some differences in
 behaviour will exist. This should be confined to error handling.
 
-B<All> differences in behaviour which are not documented here should
-be reported to ht@datani.dk and CC'd to dbi-users@fugue.com.
+B<All> differences in behaviour which are not documented here should be
+reported to ht@datani.dk and CC'd to dbi-users@fugue.com.
 
 
 =head1 SEE ALSO
