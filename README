@@ -62,6 +62,9 @@ New features (See the CHANGES file for a complete list):
 Note: a new release incorporating  binary/long support from
        Mike Battersby <mib@unimelb.edu.au> is due real soon.
 
+v0.38       2003.07.03
+ -Tim Bunce <Tim.Bunce@pobox.com> came with the correct solution to the
+  $dbh->do and $dbh->{Statement} problem.
 v0.37       2003.07.03
  -removed the saving of statement text in $dbh->do as an interim solution
   to avoid errors. Pointed out by David Coulthart <davec@columbia.edu>.
