@@ -1,5 +1,5 @@
 /*                               -*- Mode: C -*- 
- * $Id: dbdimp.psc,v 2.114 1999/09/16 14:49:53 ht000 Exp $
+ * $Id: dbdimp.psc,v 2.115 1999/10/28 10:36:25 ht000 Exp $
  *
  * Copyright (c) 1994,1995  Tim Bunce
  *           (c) 1996,1997  Henrik Tougaard
@@ -999,19 +999,38 @@ dbd_st_execute(sth, imp_sth)    /* <=0 is error, >0 is ok */
         }
         return sql_check(sth) ? sqlca.sqlerrd[2] : -2;
     } else {
+	int is_readonly;
         /* select statement: open a cursor */
+        EXEC SQL DECLARE :name CURSOR FOR :name;
+	/* 0.23 open readonly unless an "FOR UPDATE"- clause is found in */
+	/* select statement. This is done in Ingres.pm in prepare, and */
+	/* is stored in the private variable $sth->{ing_readonly}. */
+	{
+	  SV** svp;
+	  if ( (svp = hv_fetch((HV*)SvRV(sth), "ing_readonly", 12, 0)) != NULL
+	      && SvTRUE(*svp)) is_readonly = 1;
+	  else is_readonly = 0;
+	}
         if (dbis->debug >= 2)
             fprintf(DBILOGFP,
-                "DBD::Ingres::dbd_st_execute - cursor %s - param=%d\n",
-                name, imp_sth->ph_sqlda.sqld);
+                "DBD::Ingres::dbd_st_execute - cursor %s - param=%d %sreadonly\n",
+                name, imp_sth->ph_sqlda.sqld, is_readonly ? "" : "NOT ");
 
-        EXEC SQL DECLARE :name CURSOR FOR :name;
-        if (imp_sth->ph_sqlda.sqld > 0) {
-            EXEC SQL OPEN :name
-                 USING DESCRIPTOR &imp_sth->ph_sqlda;
-        } else {
-            EXEC SQL OPEN :name;
-        }
+        if (is_readonly) {
+		if (imp_sth->ph_sqlda.sqld > 0) {
+		    EXEC SQL OPEN :name FOR READONLY
+			 USING DESCRIPTOR &imp_sth->ph_sqlda;
+		} else {
+		    EXEC SQL OPEN :name FOR READONLY;
+		}
+	} else {
+		if (imp_sth->ph_sqlda.sqld > 0) {
+		    EXEC SQL OPEN :name
+			 USING DESCRIPTOR &imp_sth->ph_sqlda;
+		} else {
+		    EXEC SQL OPEN :name;
+		}
+	}
         if (!sql_check(sth)) return -2;
         DBIc_ACTIVE_on(imp_sth);
         return -1;

@@ -128,6 +128,35 @@ ok(0, my $numrows = $dbh->do( "UPDATE $testtable SET id = id+1" ),
      "do(Update) all rows", 1);
 ok(0, $numrows == 2, "Number of rows", "should be '2' is '$numrows'");
 
+### Displays all records (for test of the test!)
+###$sth=$dbh->prepare("select id, name FROM $testtable");
+###$sth->execute;
+###while (1) {
+###  $row=$sth->fetchrow_arrayref or last;
+###  print(DBI::neat_list($row), "\n");
+###}
+ok(0, $sth=$dbh->prepare("SELECT id, name FROM $testtable WHERE id=3 FOR UPDATE OF name"),
+      "prepare for update", 1);
+ok(0, $sth->execute, "execute select for update", 1);
+ok(0, $row = $sth->fetchrow_arrayref, "Fetching row for update", 1);
+ok(0, $dbh->do("UPDATE $testtable SET name='Larry Wall' WHERE CURRENT OF $sth->{CursorName}"), "do cursor update", 1);
+ok(0, $sth->finish, "finish select", 1);
+ok(0, $sth=$dbh->prepare("SELECT id, name FROM $testtable WHERE id=3"),
+      "prepare select after update", 1);
+ok(0, $sth->execute, "after update select execute", 1);
+ok(0, $row = $sth->fetchrow_arrayref, "fetching row for select_after_update", 1);
+ok(0, $row->[1] =~ /^Larry Wall/, "Col 2 value after update",
+      "Should be 'Larry Wall...' is '$row->[1]'");
+ok(0, $sth->finish, "finish", 1);
+
+### Displays all records (for test of the test!)
+###$sth=$dbh->prepare("select id, name FROM $testtable");
+###$sth->execute;
+###while (1) {
+###  $row=$sth->fetchrow_arrayref or last;
+###  print(DBI::neat_list($row), "\n");
+###}
+
 ok(0, $dbh->do( "DROP TABLE $testtable" ), "Dropping table", 1);
 ok(0, $dbh->rollback, "Rolling back", 1);
 #   What else??
@@ -148,5 +177,5 @@ $dbh and $dbh->disconnect;
 #   test of outerjoin and nullability
 #   what else?
 
-BEGIN { $num_test = 39; }
+BEGIN { $num_test = 49; }
 

@@ -1,4 +1,4 @@
-#   $Id: Ingres.pm,v 2.119 1999/10/26 06:53:57 ht000 Exp $
+#   $Id: Ingres.pm,v 2.121 1999/10/28 11:08:41 ht000 Exp $
 #
 #   Copyright (c) 1994,1995 Tim Bunce
 #             (c) 1996 Henrik Tougaard
@@ -14,8 +14,9 @@ DBD::Ingres - DBI driver for Ingres database systems
 
 =head1 SYNOPSIS
 
-    $dbh = DBI->connect($dbname, $user, $options, 'Ingres')
+    $dbh = DBI->connect("DBI:Ingres:$dbname", $user, $options, {AutoCommit=>0})
     $sth = $dbh->prepare($statement)
+    $sth = $dbh->prepare($statement, {ing_readonly=>1})
     $sth->execute
     @row = $sth->fetchrow
     $sth->finish
@@ -34,8 +35,8 @@ DBD::Ingres - DBI driver for Ingres database systems
     use DynaLoader ();
     @ISA = qw(DynaLoader);
 
-    $VERSION = '0.22';
-    my $Revision = substr(q$Revision: 2.119 $, 10);
+    $VERSION = '0.23';
+    my $Revision = substr(q$Revision: 2.121 $, 10);
 
     bootstrap DBD::Ingres $VERSION;
 
@@ -118,10 +119,14 @@ DBD::Ingres - DBI driver for Ingres database systems
 
     sub prepare {
         my($dbh, $statement, $attribs)= @_;
+	my $ing_readonly = defined($attribs->{ing_readonly}) ?
+		$attribs->{ing_readonly} :
+		scalar $statement !~ /select.*for\s+(?:deferred|direct)?\s*update\s+of/is;
 
         # create a 'blank' sth
         my $sth = DBI::_new_sth($dbh, {
-            'ing_statement' => $statement,
+            ing_statement => $statement,
+	    ing_readonly  => $ing_readonly, 
             });
 
         DBD::Ingres::st::_prepare($sth, $statement, $attribs)
@@ -293,9 +298,20 @@ Eg.
 =item Ingres/Net database
 
        connect("thatnode::thisdb;-xw -l", "him", "hispassword")
+
 =back
 
 and so on.
+
+B<Important>: The DBI spec defines that AutoCommit is B<ON> after connect.
+This is the opposite of the normal Ingres default.
+
+It is recommended that the C<connect> call ends with the attributes
+C<{ AutoCommit => 0 }>.
+
+If you dont want to check for errors after B<every> call use 
+C<{ AutoCommit => 0, RaiseError => 1 }> instead. This will C<die> with
+an error message if any DBI call fails.
 
 =item do
 
@@ -305,6 +321,61 @@ This is implemented as a call to 'EXECUTE IMMEDIATE' with all the
 limitations that this implies.
 
 Placeholders and binding is not supported with C<$dbh-E<gt>do>.
+
+=item ing_readonly
+
+Normally cursors are declared C<READONLY> 
+to increase speed. READONLY cursors don't create
+exclusive locks for all the rows selected; this is
+the default.
+
+If you need to update a row then you will need to ensure that either
+
+=over 4
+
+=item *
+
+the C<select> statement contains an C<for update of> clause, or
+
+= item *
+
+the C<$dbh-E<gt>prepare> calls includes the attribute C<{ing_readonly =E<gt> 0}>.
+
+=back
+
+Eg.
+
+   $sth = $dbh->prepare("select ....", {ing_readonly => 0});
+
+will be opened for update, as will
+
+   $sth = $dbh->prepare("select .... for direct update of ..")
+
+while
+
+   $sth = $dbh->prepare("select .... for direct update of ..",
+                { ing_readonly => 1} );
+
+will be opened C<FOR READONLY>.
+
+When you wish to actually do the update, where you would normally put the
+cursor name, you put:
+
+    $sth->{CursorName}
+
+instead,  for example:
+
+    $sth = $dbh->prepare("select a,b,c from t for update of b");
+    $sth->execute;
+    $row = $sth->fetchrow_arrayref;
+    $dbh->do("update t set b='1' where current of $sth->{CursorName}");
+
+Later you can reexecute the statement without the update-possibility by doing:
+
+    $sth->{ing_readonly} = 1;
+    $sth->execute;
+
+and so on. B<Note> that an C<update> will now cause an SQL error.
 
 =item ing_statement
 
@@ -440,7 +511,7 @@ After a commit or rollback the cursors are all ->finish'ed, ie. they
 are closed and the DBI/DBD will warn if an attempt is made to fetch
 from them.
 
-A future versiob of DBD::Ingres wil possibly re-prepare the statement.
+A future version of DBD::Ingres wil possibly re-prepare the statement.
 
 This is needed for
 
