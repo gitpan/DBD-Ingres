@@ -1,4 +1,4 @@
-#   $Id: Ingres.pm,v 1.4 1996/12/18 10:44:33 ht Exp $
+#   $Id: Ingres.pm,v 1.9 1997/01/17 07:00:26 ht Exp $
 #
 #   Copyright (c) 1994,1995 Tim Bunce
 #             (c) 1996 Henrik Tougaard
@@ -15,8 +15,8 @@ require 5.003;
     use DynaLoader ();
     @ISA = qw(DynaLoader);
 
-    $VERSION = '0.0201';
-    my $Revision = substr(q$Revision: 1.4 $, 10);
+    $VERSION = '0.04';
+    my $Revision = substr(q$Revision: 1.9 $, 10);
 
     require_version DBI 0.73;
 
@@ -121,9 +121,120 @@ require 5.003;
         DBD::Ingres::errstr(@_);
     }
 
-    sub  rows {
+    sub rows {
         DBD::Ingres::rows(@_);
     }
 }
 
 1;
+
+=head1 NAME
+
+DBD::Ingres - Ingres access interface for Perl5
+
+=head1 SYNOPSIS
+
+    $dbh = DBI->connect($dbname, $user, $options, 'Ingres')
+    $sth = $dbh->prepare($statement)
+    $sth->execute
+    @row = $sth->fetchrow
+    $sth->finish
+    $dbh->commit
+    $dbh->rollback
+    $dbh->disconnect
+    and many more
+
+=head1 DESCRIPTION
+
+DBD::Ingres is an extension to Perl which allows access to Ingres
+databases. It is built on top of the standard DBI extension an
+implements the methods that DBI require.
+
+This document describes the differences between the "generic" DBD and
+DBD::Ingres.
+
+=head2 Not implemented
+
+=over 4
+
+=item Binding
+
+Binding is not implented is this version of DBD::Ingres. It is planned
+for a future release - but does not have high priority. Any takers?
+
+As there is no binding, there is no need for reexecution of statements -
+not that anything in the code prevents it - to my knowledge :-)
+
+=item OpenIngres new features
+
+The new features of OpenIngres are not (yet) supported in DBD::Ingres.
+
+This includes BLOBS, decimal datatype and spatial datatypes.
+
+Support will be added when the need arises - if you need it you add it ;-)
+
+=back
+
+=head2 Extensions/Changes
+
+=over 4
+
+=item $dbh->do
+
+This is implemented as a call to 'EXECUTE IMMEDIATE'. (The generic way
+is through prepare, bind, execute).
+This will probably change when binds are added.
+
+=item $sth->TYPE
+
+Returns an array of the "perl"-type of the return fields of a select
+statement.
+
+The types are represented as:
+
+=over 4
+
+=item 'i': integer
+
+All integer types, ie. int1, int2 and int4.
+
+=item 'f': float
+
+The types float, float8 and money.
+
+=item 's': string
+
+All other supported types, ie. char, varchar, text, date etc.
+
+=back
+
+=item $sth->SqlLen
+
+Returns an array containing the lengths of the fields in Ingres, eg. an
+int2 will return 2, a varchar(7) 7 and so on.
+
+=item $sth->SqlType
+
+Returns an array containing the Ingres types of the fields. The types
+are given as documented in the Ingres SQL Reference Manual.
+
+=back
+
+=head1 NOTES
+
+I wonder if I have forgotten something? There is no authoritative DBI
+documentation (other than the code); it is difficult to document the
+differences from a non-existent document ;-}
+
+=head1 SEE ALSO
+
+The DBI documentation (at the end of DBI.pm).
+
+=head1 AUTHORS
+
+DBI/DBD was developed by Tim Bunce, <Tim.Bunce@ig.co.uk>, who also
+developed the DBD::Oracle that is the closest we have to a generic DBD
+implementation.
+
+Henrik Tougaard, <ht@datani.dk> developed the DBD::Ingres extension.
+=cut

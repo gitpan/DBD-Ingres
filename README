@@ -1,37 +1,18 @@
 ------------------IMPORTANT WARNING-----------------------------
 
-THIS IS PRE-ALPHA SOFTWARE!!!!
-
-You *WILL* encounter problems!
-
-If you are not confident that you can debug this software - ie. find and
-patch all problems - then wait and come back for a later release.
-
-This release passes the make test stage and is in *NO* way ready
-for production.
-
-************************
-*                      *
-* YOU HAVE BEEN WARNED *
-*                      *
-************************
-
+THIS IS ALPHA SOFTWARE!!!!
 
 I have built this on:
   DEC AXP using Ingres 6.4/05 (axp.osf/02) and Digital UNIX v3.2
   DEC AXP using Ingres 6.4/05 (axp.vms/03) and OpenVMS V6.2-1H3.
-
-No other ports have been attempted (I don't have access to Ingres on other
-platforms..)
+It has been built and tested on
+  SunOS 4.1.3 (OpenIngres 1.1) and
+  Solaris 2.5 (OpenIngres 1.2) by  Kraemer <szrzs069@sysadm.rz.uni-kiel.de>
 
 I will with pleasure accept patches and/or recommendations for improvements.
 My workload prevents me from giving this too much time - so have patience....
 
-This release is for debugging only!!!!
-
-Release 0.01 was an internal test-release that never made it out to the
-general public, release 0.02 is deemed stable enough to allow brave souls
-to test it   ;-}
+See CHANGES for an overview of the changes since last release.
 
 ------------------END OF WARNING---------------------------------------
 
@@ -70,16 +51,20 @@ BUILDING
 	make test
 	make install
 
+(For the test: set the environment variable DBI_DBNAME to the name
+of the database that you want to use. The test will create a table
+named 'testhththt', add some data to it and delete the table again.
+If you want a verbose print from the test: edit test.pl and set
+$verbose to 1)
+
+The ingtest.pl script is a "quick" hack of the test for ingperl (the
+"old" perl4 interface).
+
 If it fails horribly, see below.
 
 Do NOT hand edit the generated Makefile unless you are completely sure
 you understand the implications! Always try to make changes via the
 Makefile.PL command line and/or editing the Makefile.PL.
-
-The VMS port has uncovered an error in VMS-MakeMaker:
-   In the decsrip.mms file change "[.2]" to "Ingres.obj dbdimp.obj"
-   two places until the makemaker is fixed - I use MakeMaker (v5.38)
-You WILL have to hand edit the descrip.mms file!!!!
 
 You should never need to make any changes. If you do *please* let me
 know so that I can try to make it automatic in a later release.
@@ -90,29 +75,22 @@ KNOWN PROBLEMS:
             database-name username other-options
           otherwise the check for username wil fail.
 
-	o Many other - this will fail miserably in unpredictable ways!!
-
+	o DBD::st:rows and DBD::db::rows do not change session. This will
+          cause errors if you have more than 1 connected session and
+          use the other session between an execute and the correspondings
+	  call of rows. Eg:
+		$dbh1->do("update ...");
+		$dbh2->do("delete...");
+		$rows = $dbh1->rows;   # <- this will return $dbh2->rows
+	  I'll fix it someday.....
 
 TO DO LIST:
 
-	o Extend the DBD, so that more than one connection to the database
-	  is possible.
-
         o Add support for OpenIngres 1.2
-            blobs, dynamic link, etc.
+            blobs  etc.
 
 
 IF YOU HAVE PROBLEMS:
-
----------version 0.02 warning-----------------------
-
-READ THE WARNING ABOVE.
-
-Find and solve the problem.
-
-Mail a solution to me at ht@datani.dk
-
---------------------------------------back to the regular readme--------
 
 Firstly, check the Frequently Asked Questions, Known Bugs and any other
 pertinent documents at:

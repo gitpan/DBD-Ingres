@@ -1,4 +1,33 @@
+V0.04	1997.01.17
+	The function DBD::Ingres::st:fetch has now been reinstated
+	(thanks to Tim Bunce <Tim.Bunce@ig.co.uk> who showed the way to
+	let case insentive linker handle case sensitivity)
+
+V0.03	1997.01.09
+	Restriction on number of simultaniously open cursors removed
+	 - inspiration from Dirk Kraemer (kraemer@rz.uni-kiel.de)
+
+	Multiple database connects possible
+
+	Must reuse statement numbers as the number of different
+	statement names between commits is limited by the available
+	parser memory. You get error:
+		E_PS0F02_MEMORY_FULL
+		  There is no more available memory. Try again later.
+	when this happens.
+
+	DBD::rows does not change the session - will have to discover
+	whether this is a dbh or a sth to get the session number.
+	Tried (unsuccessfully) to use $dbh->{Database} in Ingres.pm
+	- any better ideas?
+
 V0.0201  1996.12.18
 	Can now link dynamically on Unix
 	 - thanks to Paul Lindner <lindner@itu.int>
 
+	Solaris fixes to Makefile.PL
+	 - thanks to Dirk Kraemer (kraemer@rz.uni-kiel.de)
+
+	The bug in VMS MakeMaker has been fixed - require a
+	version that includes the fix!
+	Still need to improve the ingres.opt handling.

@@ -1,19 +1,5 @@
-#!/usr/bin/perl
-#
-# This Perl-script does the cursor unrolling for dbdimp.sc
-#
-# Needed variables:
-#     max_cursor =>  the number of simultaneouly open cursors
-#
-$max_cursor = $ARGV[0] || $ENV{MAX_CURSOR} || 9;
-
-$rcs_id='$Id: dbdimp.PL,v 1.3 1996/12/03 08:11:55 ht Exp $';
-
-open(OUT, ">dbdimp.sc") or die "Can't create dbdimp.sc\n";
-
-print OUT <<'END_PART';
 /*
- * $rcs_id
+ * $Id: dbdimp.sc,v 1.8 1997/01/10 14:40:39 ht Exp $
  *
  * Copyright (c) 1994,1995  Tim Bunce
  *           (c) 1996 Henrik Tougaard
@@ -27,22 +13,15 @@ print OUT <<'END_PART';
  *
  * The blame for this abuse of Tim Bunce's good code lies solely on
  * me ht@datani.dk.
- * Ideas for cursor handling are stolen from DBD::Informix by
- * Alligator Descartes.
  *
  */
 
 
 EXEC SQL INCLUDE 'Ingres.sh';
 
-END_PART
-print OUT <<END_PART;
-#define MAX_CURSORS $max_cursor
-static cursor cursors[MAX_CURSORS + 1];
-END_PART
-print OUT <<'END_PART';
 DBISTATE_DECLARE;
-
+static int cur_session;    /* the 'current' Ingres session_id */
+static int nxt_session;    /* the next 'available' session_id */
 int
 sql_check(h)
     SV * h;
@@ -80,22 +59,28 @@ error(h, error_num, text)
     sv_setpv(DBIc_ERRSTR(imp_xxh), (char*)text);
 }
 
-static int
-new_cursor(h)
+void
+set_session_db(h)
     SV * h;
 {
-    int i;
-    
-    if (dbis->debug >= 2)
-        fprintf(DBILOGFP,"Trying to get cursor\n");
-        
-    for (i = 0; i < MAX_CURSORS; ++i) {
-        if (!cursors[i].is_open) {
-            return i;
-        }
+    D_imp_dbh(h);
+    EXEC SQL BEGIN DECLARE SECTION;
+    int session_id = imp_dbh->session;
+    EXEC SQL END DECLARE SECTION;
+    if (dbis->debug >= 3)
+        fprintf(DBILOGFP, "set session_db(%d)\n", session_id);
+    if (cur_session != session_id) {
+        EXEC SQL SET_SQL(SESSION = :session_id);
+ 	cur_session = session_id;
     }
-    error(h, -276, "All cursors in use already");
-    return -1;
+}
+
+void
+set_session_st(h)
+    SV * h;
+{
+    D_imp_sth(h);
+    set_session_db(DBIc_PARENT_H(imp_sth));
 }
 
 void
@@ -103,22 +88,80 @@ dbd_init(dbistate)
     dbistate_t *dbistate;
 {
     DBIS = dbistate;
+    cur_session = 1;
+    nxt_session = 1;
+}
+
+static U32* statement_numbers;   /* bitmask of reserved statement nos */
+static int statement_max;         /* max bit number allocated (8 pr char) */
+
+void release_statement(num)
+    int num;
+{
+    if (num < 0 || num >= statement_max*8) return;
+    statement_numbers[num/8] &= ~(1<<(num%8));
+    if (dbis->debug >= 4)
+	fprintf(DBILOGFP, "rel_st.nam: %d [%d]=%u\n", num, num/8,
+	statement_numbers[num/8]);
 }
 
 static char*
-generate_statement_name()
+generate_statement_name(st_num)
+    int * st_num;
 {
-    /* generates a (unique) statement name for each statement */
-    /* I wonder if this is neccessary. We migth probably just */
-    /* as well use the statement itself as name - or we could */
-    /* use the cursor  number (or a function of it). The Ingres */
-    /* documentation is extreemly weak here. */
-    
-    static char name[20];
-    static int seed;
-    sprintf(name, "stmt%12.12d", seed);
+    /* find a (new) statement -name for this statement.
+    ** Names can be reused when the statement handle is destroyed.
+    ** The number of active statements is limited by the PSF in Ingres
+    */    
+    char name[20];
+    int i, found=0, num;
+    if (dbis->debug >= 4)
+	fprintf(DBILOGFP, "gen_st.nam");
+    for (i=0; i<statement_max; i++) {
+        /* see if there is a free statement-name in the already allocated lump
+        */
+        int bit;
+        if (dbis->debug >= 4)
+	    fprintf(DBILOGFP, " [%d]=%u", i, statement_numbers[i]);
+        for (bit=0; bit < 32; bit++) {
+            if (((statement_numbers[i]>>bit) & 1) == 0) {
+                /* free bit found */
+                num = i*32+bit;
+                found = 1;
+                break;
+            }
+        }
+        if (found) break;
+    }
+    if (!found) {
+        /* allocate a new lump af numbers and take the first one */
+        if (statement_max == 0) {
+            /* first time round */
+            if (dbis->debug >= 4)
+	        fprintf(DBILOGFP, " alloc first time");
+            num = 0;
+            Newz(42, statement_numbers, 8, U32);
+            for(i = statement_max; i <= statement_max+8; i++)
+                statement_numbers[i] = 0;
+            statement_max = 8;
+        } else {
+            num = statement_max * 32;
+            if (dbis->debug >= 4)
+	        fprintf(DBILOGFP, " alloc to %d", statement_max);
+            Renew(statement_numbers, statement_max+8, U32);
+            for(i = statement_max; i <= statement_max+8; i++)
+                statement_numbers[i] = 0;
+            statement_max += 8;
+        }
+    }
+    statement_numbers[num/8] |= (1<<(num%8));
+    sprintf(name, "stmt%12.12d", num);
+    if (dbis->debug >= 4)
+        fprintf(DBILOGFP, " returns %d\n", num);
+    *st_num = num;
     return savepv(name);
 }
+
 
 void
 fbh_dump(fbh, i)
@@ -163,23 +206,31 @@ dbd_db_login(dbh, dbname, user, pass)
     EXEC SQL END DECLARE SECTION;
 {
     D_imp_dbh(dbh);
+    EXEC SQL BEGIN DECLARE SECTION;
+    int session;
+    EXEC SQL END DECLARE SECTION;
 
     if (dbis->debug >= 2)
         fprintf(DBILOGFP,"DBD::Ingres::dbd_db_login: database: %s\n", dbname);
 
+    session = imp_dbh->session = nxt_session++;
 
     if (user && *user && *user != '/') {
         /* we have a username */
         if (dbis->debug >= 3) fprintf(DBILOGFP, "    user='%s', opt='%s'\n",
                                 user, pass);
-        EXEC SQL CONNECT :dbname IDENTIFIED BY :user OPTIONS = :pass;
+        EXEC SQL CONNECT :dbname SESSION :session
+		 IDENTIFIED BY :user OPTIONS = :pass;
+
     } else {
         /* just the databasename */
         if (dbis->debug >= 3) fprintf(DBILOGFP, "    nouser\n");
-        EXEC SQL CONNECT :dbname OPTIONS = :pass;
+        EXEC SQL CONNECT :dbname SESSION :session OPTIONS = :pass;
     }
-    if (dbis->debug >= 3) fprintf(DBILOGFP, "    After connect, sqlcode=%d\n",
-                            sqlca.sqlcode);
+    if (dbis->debug >= 3)
+	fprintf(DBILOGFP, "    After connect, sqlcode=%d, session=%d\n",
+                            sqlca.sqlcode, imp_dbh->session);
+    cur_session = imp_dbh->session;
     if (!sql_check(dbh)) return 0;
     DBIc_IMPSET_on(imp_dbh);    /* imp_dbh set up now                   */
     DBIc_ACTIVE_on(imp_dbh);    /* call disconnect before freeing       */
@@ -199,7 +250,8 @@ dbd_db_do(dbh, statement, attribs, params)
 
     if (dbis->debug >= 2)
         fprintf(DBILOGFP,"DBD::Ingres::dbd_db_do(\"%s\")\n", statement);
-
+    set_session_db(dbh);
+    
     EXEC SQL EXECUTE IMMEDIATE :statement;
     if (!sql_check(dbh)) return -1;
     else return sqlca.sqlerrd[2]; /* rowcount */
@@ -214,6 +266,7 @@ dbd_db_commit(dbh)
     if (dbis->debug >= 2)
         fprintf(DBILOGFP,"DBD::Ingres::dbd_db_commit\n");
 
+    set_session_db(dbh);
     EXEC SQL COMMIT;
     return sql_check(dbh);
 }
@@ -227,6 +280,7 @@ dbd_db_rollback(dbh)
     if (dbis->debug >= 2)
         fprintf(DBILOGFP,"DBD::Ingres::dbd_db_rollback\n");
 
+    set_session_db(dbh);
     EXEC SQL ROLLBACK;
     return sql_check(dbh);
 }
@@ -244,6 +298,7 @@ dbd_db_disconnect(dbh)
     if (dbis->debug >= 2)
         fprintf(DBILOGFP,"DBD::Ingres::dbd_db_disconnect\n");
 
+    set_session_db(dbh);
     EXEC SQL INQUIRE_INGRES(:transaction_active = TRANSACTION);
     if (transaction_active == 1){
         warn("Ingres: You should commit or rollback before disconnect.");
@@ -290,8 +345,8 @@ dbd_db_STORE(dbh, keysv, valuesv)
     SV *cachesv = NULL;
     int on = SvTRUE(valuesv);
 
+    set_session_db(dbh);
     if (kl==10 && strEQ(key, "AutoCommit")){
-        /* Ignore SvTRUE warning: '=' where '==' may have been intended. */
         if (on) {
             EXEC SQL SET AUTOCOMMIT ON;
         } else {
@@ -357,13 +412,14 @@ dbd_st_prepare(sth, statement)
     imp_sth->done_desc = 0;
     sqlda = &imp_sth->sqlda;
     sqlda->sqln = IISQ_MAX_COLS;
-    name = imp_sth->name = generate_statement_name();
+    name = imp_sth->name = generate_statement_name(&imp_sth->st_num);
     
     if (dbis->debug >= 3)
         fprintf(DBILOGFP,
             "DBD::Ingres::dbd_st_prepare statement('%s') name is %s, sqlda: %p\n",
             statement, name, sqlda);
 
+    set_session_st(sth);
     EXEC SQL PREPARE :name INTO sqlda FROM :statement;
     if (!sql_check(sth)) return 0;
 
@@ -373,8 +429,6 @@ dbd_st_prepare(sth, statement)
                 sqlda->sqld, sqlda->sqln);
     }
     imp_sth->fbh_num = sqlda->sqld;
-    imp_sth->row_num = 0;
-    imp_sth->cursoridx = -1; /* unknown */
     DBIc_NUM_FIELDS(imp_sth) = imp_sth->fbh_num;
 
     if (dbis->debug >= 2)
@@ -498,6 +552,7 @@ dbd_st_execute(sth)	/* <=0 is error, >0 is ok */
     }
 
     /* Trigger execution of the statement			*/
+    set_session_st(sth);
     if (imp_sth->fbh_num == 0) {
         /* non-select statement: just execute it */
         if (dbis->debug >= 2)
@@ -507,30 +562,12 @@ dbd_st_execute(sth)	/* <=0 is error, >0 is ok */
         return sql_check(sth) ? sqlca.sqlerrd[2] : -1;
     } else {
         /* select statement: open a cursor */
-        int cursor_num = new_cursor(sth);
-        if (cursor_num < 0) {
-            return -1;
-        }
-
         if (dbis->debug >= 2)
-            fprintf(DBILOGFP,"DBD::Ingres::dbd_st_execute - cursor %d\n", cursor_num);
+            fprintf(DBILOGFP,"DBD::Ingres::dbd_st_execute - cursor %s\n", name);
 
-        imp_sth->cursoridx = cursor_num;
-        /** Update cursor status in cursor array */
-        cursors[cursor_num].is_open = 1;
-        switch (cursor_num) {
-END_PART
-for $cursor (0..$max_cursor) {
-print OUT <<END_LOOP;
-        case $cursor:
-            EXEC SQL DECLARE sql_cursor$cursor CURSOR FOR :name;
-            EXEC SQL OPEN sql_cursor$cursor FOR READONLY;
-            if (!sql_check(sth)) return -1;
-            break;
-END_LOOP
-}
-print OUT <<'END_PART';
-        }
+        EXEC SQL DECLARE :name CURSOR FOR :name;
+        EXEC SQL OPEN :name FOR READONLY;
+        if (!sql_check(sth)) return -1;
         DBIc_ACTIVE_on(imp_sth);
         return 0;
     }
@@ -545,6 +582,9 @@ dbd_st_fetchrow(sth)
     int num_fields;
     int i;
     AV *av;
+    EXEC SQL BEGIN DECLARE SECTION;
+    char* name = imp_sth->name;
+    EXEC SQL END DECLARE SECTION;
 
     if (dbis->debug >= 2)
         fprintf(DBILOGFP,"DBD::Ingres::dbd_st_fetchrow(%s)\n", imp_sth->name);
@@ -553,26 +593,9 @@ dbd_st_fetchrow(sth)
         error(sth, -7, "fetch without open cursor");
         return Nullav;
     }
+    set_session_st(sth);
     sqlda = &imp_sth->sqlda;
-    /*if (dbis->debug >= 3) {
-    **    fprintf(DBILOGFP, "sqlda: %p\n", sqlda);
-    **    for (i=0; i<imp_sth->fbh_num; i++) {
-    **        imp_fbh_t *fbh = &imp_sth->fbh[i];
-    **        fbh_dump(fbh, i);
-    **    }
-    **}*/
-    
-    switch(imp_sth->cursoridx) {
-END_PART
-for $cursor (0..$max_cursor) {
-print OUT <<END_LOOP;
-    case $cursor:
-        EXEC SQL FETCH sql_cursor$cursor USING DESCRIPTOR :sqlda;
-        break;
-END_LOOP
-}
-print OUT <<'END_PART';
-    }
+    EXEC SQL FETCH :name USING DESCRIPTOR :sqlda;
     if (sqlca.sqlcode == 100) {
         return Nullav;
     } else
@@ -629,37 +652,23 @@ dbd_st_finish(sth)
     SV *sth;
 {
     D_imp_sth(sth);
+    EXEC SQL BEGIN DECLARE SECTION;
+    char* name = imp_sth->name;
+    EXEC SQL END DECLARE SECTION;
+    
     /* Cancel further fetches from this cursor.                 */
-    /* close the cursor - unlike Oracle, as there is no reason  */
-    /* to reexecute it.. We won't do binds for a while yet..    */
+    if (DBIc_ACTIVE(imp_sth)) {
+        if (dbis->debug >= 3)
+            fprintf(DBILOGFP,"DBD::Ingres::dbd_st_finish(%s)\n",
+                imp_sth->name);
+        set_session_st(sth);
+        EXEC SQL CLOSE :name;
+    }
+    DBIc_ACTIVE_off(imp_sth);
 
     if (dbis->debug >= 2)
         fprintf(DBILOGFP,"DBD::Ingres::dbd_st_finish(%s)\n", imp_sth->name);
 
-    if (DBIc_ACTIVE(imp_sth)) {
-        int sqc = imp_sth->cursoridx;
-        /* check if we have to close the cursor... */
-        if (sqc >= 0 && sqc < MAX_CURSORS && cursors[sqc].is_open) {
-
-            if (dbis->debug >= 3)
-                fprintf(DBILOGFP,"DBD::Ingres::dbd_st_finish(%s), close cursor # %d\n",
-                    imp_sth->name, imp_sth->cursoridx);
-
-            switch (sqc) {
-END_PART
-for $cursor (0..$max_cursor) {
-print OUT <<END_LOOP;
-            case $cursor:
-                EXEC SQL CLOSE sql_cursor$cursor;
-                break;
-END_LOOP
-}
-print OUT <<'END_PART';
-            }
-        cursors[sqc].is_open = 0;
-        }
-    }
-    DBIc_ACTIVE_off(imp_sth);
     return 1;
 }
 
@@ -674,6 +683,8 @@ dbd_st_destroy(sth)
     if (dbis->debug >= 2)
         fprintf(DBILOGFP,"DBD::Ingres::dbd_st_destroy(%s)\n", imp_sth->name);
 
+    release_statement(imp_sth->st_num);
+     
     /* XXX free contents of imp_sth here */
     DBIc_IMPSET_off(imp_sth);
 }
@@ -762,4 +773,4 @@ dbd_st_FETCH(sth, keysv)
     }
     return sv_2mortal(retsv);
 }
-END_PART
+

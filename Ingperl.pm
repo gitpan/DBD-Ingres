@@ -1,5 +1,5 @@
 #
-# $Id: Ingperl.pm,v 1.6 1996/12/02 11:56:06 ht Exp $
+# $Id: Ingperl.pm,v 1.7 1997/01/15 07:53:10 ht Exp $
 #
 # Ingperl emulation interface for DBD::Ingres
 #
@@ -17,7 +17,7 @@ use DBI 0.73;
 use Exporter;
 use Carp;
 
-$VERSION = substr(q$Revision: 1.6 $, 10);
+$VERSION = substr(q$Revision: 1.7 $, 10);
 
 @ISA = qw(Exporter);
 
@@ -174,21 +174,26 @@ $Ingperl::sql_debug = 0;
 #
 # Library function to execute a select and return first row
 sub sql_eval_row1{
-	&sql(@_);
-	return undef if $::sql_error;
-	my(@row) = &sql_fetch;	# fetch one row
-	&sql_close;					# close the cursor
+	my $sth = $sql_dbh->prepare(@_);
+	return undef unless $sth;
+	$sth->execute or return undef;
+	my(@row) = $sth->fetchrow;	# fetch one row
+	$sth->finish;			# close the cursor
+	undef $sth;
 	@row;
 }
 
 # Library function to execute a select and return first col
 sub sql_eval_col1{
-	&sql(@_);
-	return undef if $::sql_error;
-	my(@row, @col);
+	my $sth = $sql_dbh->prepare(@_);
+	return undef unless $sth;
+	$sth->execute or return undef;
+        my (@row, @col);
 	while (@row = &sql_fetch){
 		push(@col, $row[0]);
 	}
+	$sth->finish;			# close the cursor
+	undef $sth;
 	@col;
 }
 

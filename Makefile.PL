@@ -1,9 +1,9 @@
 #!/usr/local/bin/perl -sw
-# $Id: Makefile.PL,v 1.6 1996/12/18 10:44:33 ht Exp $
+# $Id: Makefile.PL,v 1.7 1997/01/09 08:09:19 ht Exp $
 
 require 5.003;
 
-use ExtUtils::MakeMaker 5.17, qw(&WriteMakefile $Verbose);
+use ExtUtils::MakeMaker 5.38, qw(&WriteMakefile $Verbose);
 use Getopt::Long;
 use Config;
 use strict;
@@ -84,6 +84,11 @@ if ($Config{osname} eq 'VMS') {
     $libhome = "";
 }
 
+# Solaris needs the elf-library
+if ($Config{osname} eq 'solaris') {
+    $linkwith .= " -lelf";
+}
+
 # log key platform information to help me help you quickly
 print "System: perl$] @Config{qw(myuname)}\n",
       "Compiler: @Config{qw(cc optimize ccflags)}\n",
@@ -99,8 +104,7 @@ $opts{OBJECT} = 'Ingres$(OBJ_EXT) dbdimp$(OBJ_EXT)';
 $opts{depend} = { "dbdimp\$(OBJ_EXT)" => "dbdimp.c Ingres.h",
 		  "Ingres\$(OBJ_EXT)" => "Ingres.h",
                 };
-$opts{PL_FILES} = { "dbdimp.PL" => "dbdimp.sc" };
-$opts{clean} = { FILES => "dbdimp.sc dbdimp.c Ingres.h" };
+$opts{clean} = { FILES => "dbdimp.c Ingres.h" };
 $opts{macro} = { ESQLC => "esqlc", ESQLCOPT => "-o.h" };
 
 WriteMakefile(%opts);

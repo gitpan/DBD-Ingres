@@ -1,5 +1,5 @@
 /*
-   $Id: Ingres.xs,v 1.4 1996/12/02 12:54:18 ht Exp $
+   $Id: Ingres.xs,v 1.5 1997/01/15 08:14:19 ht Exp $
 
    Copyright (c) 1994,1995  Tim Bunce
 
@@ -55,8 +55,10 @@ rows(h)
 MODULE = DBD::Ingres    PACKAGE = DBD::Ingres::dr
 
 void
-disconnect_all(drh)
-    SV *        drh
+discon_all(drh)
+    SV *       drh
+    ALIAS:
+    disconnect_all = 1
     CODE:
     if (!dirty && !SvTRUE(perl_get_sv("DBI::PERL_ENDING",0))) {
         D_imp_drh(drh);
@@ -125,9 +127,11 @@ STORE(dbh, keysv, valuesv)
             ST(0) = &sv_no;
 
 void
-FETCH(dbh, keysv)
+FETCH_attrib_(dbh, keysv)
     SV *        dbh
     SV *        keysv
+    ALIAS:
+    FETCH = 1
     CODE:
     SV *valuesv = dbd_db_FETCH(dbh, keysv);
     if (!valuesv)
@@ -201,6 +205,12 @@ execute(sth, ...)
     else
         XST_mIV(0, retval);     /* OK: rowcount */
 
+void
+fetch(sth)
+    SV *        sth
+    CODE:
+    AV *av = dbd_st_fetchrow(sth);
+    ST(0) = (av) ? sv_2mortal(newRV((SV *)av)) : &sv_undef;
 
 void
 fetchrow(sth)
@@ -218,7 +228,6 @@ fetchrow(sth)
         }
     }
 
-
 void
 STORE(sth, keysv, valuesv)
     SV *        sth
@@ -232,9 +241,11 @@ STORE(sth, keysv, valuesv)
 
 
 void
-FETCH(sth, keysv)
+FETCH_attrib_(sth, keysv)
     SV *        sth
     SV *        keysv
+    ALIAS:
+    FETCH = 1
     CODE:
     SV *valuesv = dbd_st_FETCH(sth, keysv);
     if (!valuesv)
