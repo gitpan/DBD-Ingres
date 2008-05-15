@@ -156,7 +156,8 @@ my $INSTALLSITEARCH = $INC{'DBI.pm'};
 $INSTALLSITEARCH =~ s{/DBI.pm$}{};
 my $DBIXS_INSTALL_DIR;
 foreach my $guess ("$INSTALLSITEARCH/" . $Config::Config{archname},
-		$Config::Config{'installsitearch'}) {
+		$Config::Config{'installsitearch'},
+		"$INSTALLSITEARCH/") {
     if (-f "$guess/auto/DBI/DBIXS.h") {
         $DBIXS_INSTALL_DIR = "$guess/auto/DBI";
         $opts{'INC'} = "-I$DBIXS_INSTALL_DIR";

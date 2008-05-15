@@ -1,4 +1,8 @@
 $Id: //depot/tilpasninger/dbd-ingres/CHANGES#18 $ $DateTime: 2004/01/12 12:10:18 $ $Author: ht000 $
+v0.52     2008.05.15
+ - add missing timestamp types
+ - add workaround for do statements with placeholders
+ -> works for Ingres2006 R3
 v0.51     2004.01.12
  Added an errorcheck on the rollback when disconnecting with open transaction.
  Corrected spelling of $dbh->{PrintError} in Ingperl.pm

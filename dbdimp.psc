@@ -956,6 +956,9 @@ dbd_describe(sth, imp_sth)
         case IISQ_TXT_TYPE:
         case IISQ_VCH_TYPE:
         case IISQ_VBYTE_TYPE:
+	case IISQ_TSW_TYPE:
+	case IISQ_TSWO_TYPE:
+	case IISQ_TSTMP_TYPE:
             var->sqltype = IISQ_VCH_TYPE;
             fbh->len = var->sqllen;
             strcpy(fbh->type, "s");

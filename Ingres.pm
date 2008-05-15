@@ -112,10 +112,35 @@ DBD::Ingres - DBI driver for Ingres database systems
     sub do {
         my($dbh, $statement, $attribs, @params) = @_;
         Carp::carp "DBD::Ingres::\$dbh->do() attribs unused\n" if $attribs;
-        Carp::carp "DBD::Ingres::\$dbh->do() params unused\n" if @params;
-	delete $dbh->{Statement};
-        my $numrows = DBD::Ingres::db::_do($dbh, $statement);
-	return $numrows;
+        #Carp::carp "DBD::Ingres::\$dbh->do() params unused\n" if @params;
+	if (
+	    (lc($statement) =~ /^select/) or
+	    (lc($statement) =~ /^insert/) or
+	    (lc($statement) =~ /^update/) or
+	    (lc($statement) =~ /^delete/)
+	   )
+	{
+	    my $sth = $dbh->prepare($statement) or return undef;
+	    my $cnt = 0;
+	    foreach (@params) {
+		++$cnt;
+		if (length() <= 32000) {
+		    $sth->bind_param($cnt, $_, { TYPE => DBI::SQL_VARCHAR });
+		}
+		else {
+		    $sth->bind_param($cnt, $_, { TYPE => DBI::SQL_LONGVARCHAR });
+		}
+	    }
+	    my $numrows = $sth->execute() or return undef;
+	    $sth->finish;
+	    return $numrows; #return $sth->rows; should bring the same result, but doesnt
+	}
+	else
+	{
+	    delete $dbh->{Statement};
+    	    my $numrows = DBD::Ingres::db::_do($dbh, $statement);
+	    return $numrows ;
+	}	
     }
 
     sub prepare {
@@ -353,9 +378,11 @@ See F<t/event.t> for an example of usage.
 =head2 do
 
 $dbh->do is implemented as a call to 'EXECUTE IMMEDIATE' with all the
-limitations that this implies.
+limitations that this implies. (with v0.52 SREAGLE did a workaround
+which does a call to "PREPARE" and a subsequent "EXECUTE" on perl-base)
 
 Placeholders and binding are not supported with C<$dbh-E<gt>do>.
+(with the workaround they are... SREAGLE)
 
 =head2 Binary Data
 
