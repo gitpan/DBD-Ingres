@@ -110,7 +110,7 @@ DBD::Ingres - DBI driver for Ingres database systems
     use strict;
 
     sub do {
-        my($dbh, $statement, $attribs, @params) = @_;
+        my ($dbh, $statement, $attribs, @params) = @_;
         Carp::carp "DBD::Ingres::\$dbh->do() attribs unused\n" if $attribs;
         #Carp::carp "DBD::Ingres::\$dbh->do() params unused\n" if @params;
 	if (
@@ -124,11 +124,13 @@ DBD::Ingres - DBI driver for Ingres database systems
 	    my $cnt = 0;
 	    foreach (@params) {
 		++$cnt;
-		if (length() <= 32000) {
-		    $sth->bind_param($cnt, $_, { TYPE => DBI::SQL_VARCHAR });
-		}
+		if ( ! defined ) {
+		    #Null value to be binded... bind_param expects datatype - but what?
+		    $sth->bind_param($cnt, $_, { TYPE => DBI::SQL_VARCHAR }); #good as any guess?
+		 }
 		else {
-		    $sth->bind_param($cnt, $_, { TYPE => DBI::SQL_LONGVARCHAR });
+        	    if ( length() <= 32000 ) {	$sth->bind_param($cnt, $_); }
+		    else { $sth->bind_param($cnt, $_, { TYPE => DBI::SQL_LONGVARCHAR }); }
 		}
 	    }
 	    my $numrows = $sth->execute() or return undef;
