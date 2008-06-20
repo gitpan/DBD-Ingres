@@ -174,7 +174,7 @@ generate_statement_name(st_num, name)
     int * st_num;
     char * name;
 {
-    /* find a (new) statement -name for this statement.
+    /* find a (new) statement-name for this statement.
     ** Names can be reused when the statement handle is destroyed.
     ** The number of active statements is limited by the PSF in Ingres
     */    
@@ -645,16 +645,29 @@ dbd_st_prepare(sth, imp_sth, statement, attribs)
     sqlda->sqldabc = sizeof(IISQLDA);
     sqlda->sqln = IISQ_MAX_COLS;
     { /* Make a statement name - contains unique number +
-         first part of statement (after select, as this is always a
-         select statement */
+         first part of statement */
         char *p = statement;
         char *n;
-        while (*p && *p != 's' && *p != 'S') ++p; /* find s in select */
+	/* find first DML letter */
+        while (*p && *p != 's' && *p != 'S' && *p != 'i' && *p != 'I' &&
+	     *p != 'd' && *p != 'D' && *p != 'u' && *p != 'U') ++p; 
         if (dbis->debug >= 4)
             PerlIO_printf(DBILOGFP, "Statement = %s \n", p);
-        p += 6; /* points past select */
+	/* points past DML keyword (select,insert into,delete from,update */    
+	switch (*p) {
+	    case 's':
+	    case 'S':
+	    case 'u':
+	    case 'U':
+		p += 6;	break;
+	    case 'i':
+	    case 'I':
+	    case 'd':
+	    case 'D':
+		p += 11; break;
+	}
         if (dbis->debug >= 4)
-            PerlIO_printf(DBILOGFP, "Statement = %s \n", p);
+            PerlIO_printf(DBILOGFP, "Statement2 = %s \n", p);
         while (*p && *p <= 32) ++p; /* past any whitespace */
         if (dbis->debug >= 4)
             PerlIO_printf(DBILOGFP, "Statement3 = %s \n", p);
@@ -728,11 +741,14 @@ dbd_st_prepare(sth, imp_sth, statement, attribs)
           
           for (param_no=0; param_no < param_max; param_no++) {
             var = &imp_sth->ph_sqlda.sqlvar[param_no];
-	    var->sqltype = 0;
-            var->sqldata = 0;
-            var->sqllen  = 0;
+	    Renew(var->sqltype,1,short);
+            Renew(var->sqldata,1,char);
+            Renew(var->sqllen,1,short);
           }
         }
+        EXEC SQL DESCRIBE INPUT :name USING DESCRIPTOR sqlda;
+	
+	//TODO: fill "ing_ph_type(s)","ing_ph_lengths", check for unknown types
     }
 
     if (dbis->debug >= 2)
@@ -950,15 +966,18 @@ dbd_describe(sth, imp_sth)
             break;
         case IISQ_DTE_TYPE:
             var->sqllen = IISQ_DTE_LEN;
+	case IISQ_TSW_TYPE:
+	    var->sqllen = IISQ_TSW_LEN;
+	case IISQ_TSWO_TYPE:
+	    var->sqllen = IISQ_TSWO_LEN;
+	case IISQ_TSTMP_TYPE:
+	    var->sqllen = IISQ_TSTMP_LEN;
             /* FALLTHROUGH */
         case IISQ_CHA_TYPE:
         case IISQ_BYTE_TYPE:
         case IISQ_TXT_TYPE:
         case IISQ_VCH_TYPE:
         case IISQ_VBYTE_TYPE:
-	case IISQ_TSW_TYPE:
-	case IISQ_TSWO_TYPE:
-	case IISQ_TSTMP_TYPE:
             var->sqltype = IISQ_VCH_TYPE;
             fbh->len = var->sqllen;
             strcpy(fbh->type, "s");
@@ -1066,6 +1085,38 @@ dbd_bind_ph (sth, imp_sth, param, value, sql_type, attribs, is_inout, maxlen)
         SvREFCNT_dec((SV *)hdlr->sqlarg);
     }
 
+    //SRE: already got type by DESCRIBE INPUT
+    //TODO: clean out earlier workaround
+    switch (abs(var->sqltype)) {
+    case IISQ_INT_TYPE:
+        type = 1;
+        break;
+    case IISQ_FLT_TYPE:
+        type = 2;
+        break;
+    case IISQ_DTE_TYPE:
+    case IISQ_MNY_TYPE:
+    case IISQ_DEC_TYPE:
+    case IISQ_CHA_TYPE:
+    case IISQ_TXT_TYPE:
+    case IISQ_VCH_TYPE:
+    case IISQ_TSW_TYPE:
+    case IISQ_TSWO_TYPE:
+    case IISQ_TSTMP_TYPE:
+    case IISQ_BYTE_TYPE:
+    case IISQ_VBYTE_TYPE:
+	type = 3;
+    	break;
+    case IISQ_LVCH_TYPE:
+    case IISQ_LBYTE_TYPE:
+        type = 4;
+	break;
+    default:        /* oh dear! */
+        type = 0;
+        break;
+    }
+    
+    if (type == 0) {
     if (sql_type) {
         switch (sql_type) {
         case SQL_INTEGER:
@@ -1100,8 +1151,10 @@ dbd_bind_ph (sth, imp_sth, param, value, sql_type, attribs, is_inout, maxlen)
     } else { /* char */
         type = 3;
     }
+    }
     if (dbis->debug >= 3)
         PerlIO_printf(DBILOGFP, "  type=%d\n", type);
+
 
     var->sqlind  = 0;
     switch (type) {
@@ -1109,6 +1162,7 @@ dbd_bind_ph (sth, imp_sth, param, value, sql_type, attribs, is_inout, maxlen)
          * it seems using Renew() each time to change the size of
          * the buffer is just as fast and much easier because you
          * don't have to worry about the 0 case. */
+	/* addition: now you have to :( */
     case 1: /* int */
         var->sqltype = IISQ_INT_TYPE;
         var->sqllen = sizeof(int);
@@ -1510,6 +1564,7 @@ dbd_st_FETCH_attrib(sth, imp_sth, keysv)
     STRLEN kl;
     char *key = SvPV(keysv,kl);
     int i;
+    int j;
     SV *retsv = NULL;
     /* Default to caching results for DBI dispatch quick_FETCH  */
     int cacheit = TRUE;
@@ -1531,6 +1586,7 @@ dbd_st_FETCH_attrib(sth, imp_sth, keysv)
     }
 
     i = DBIc_NUM_FIELDS(imp_sth);
+    j = DBIc_NUM_PARAMS(imp_sth);
 
     if (kl==4 && strEQ(key, "TYPE")){
         AV *av = newAV();
@@ -1660,9 +1716,21 @@ dbd_st_FETCH_attrib(sth, imp_sth, keysv)
         retsv = newRV_noinc((SV*)av);
         while(--i >= 0)
             av_store(av, i, newSViv((IV)imp_sth->fbh[i].origtype));
+    } else if (kl==15 && strEQ(key, "ing_ph_ingtypes")) {
+        AV *av = newAV();
+        retsv = newRV_noinc((SV*)av);
+        while(--j >= 0)
+            av_store(av, j, newSViv((IV)imp_sth->ph_sqlda.sqlvar[j].sqltype));
+    } else if (kl==17 && strEQ(key, "ing_ph_inglengths")) {
+        AV *av = newAV();
+        retsv = newRV_noinc((SV*)av);
+        while(--j >= 0)
+            av_store(av, j, newSViv((IV)imp_sth->ph_sqlda.sqlvar[j].sqllen));
     } else {
         return Nullsv;
     }
+
+
     if (cacheit) { /* cache for next time (via DBI quick_FETCH) */
         SV **svp = hv_fetch((HV*)SvRV(sth), key, kl, 1);
         sv_free(*svp);

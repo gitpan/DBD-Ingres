@@ -109,12 +109,23 @@ DBD::Ingres - DBI driver for Ingres database systems
 {   package DBD::Ingres::db; # ====== DATABASE ======
     use strict;
 
+    #EXPERIMENTAL! Do not use it!
+    sub datatype_helper {
+	my ($dbh, $schema, $tablename, $columnname) = @_;
+	my $href = undef;
+	my $sth = $dbh->column_info('',$schema, $tablename,$columnname);
+	return until $href = $sth->fetchrow_hashref;
+	if (${$href}{type_name} =~ /LONG VARCHAR/ ) { return DBI::SQL_LONGVARCHAR; }
+	elsif (${$href}{type_name} =~ /LONG BYTE/ ) { return DBI::SQL_LONGVARBINARY; }
+	elsif (${$href}{type_name} =~ /DECIMAL/ ) { return DBI::SQL_DECIMAL; }
+	elsif (${$href}{type_name} =~ /INT/ ) { return DBI::SQL_INTEGER; }
+	else { return DBI::SQL_VARCHAR; }
+    }
+
     sub do {
         my ($dbh, $statement, $attribs, @params) = @_;
         Carp::carp "DBD::Ingres::\$dbh->do() attribs unused\n" if $attribs;
-        #Carp::carp "DBD::Ingres::\$dbh->do() params unused\n" if @params;
 	if (
-	    (lc($statement) =~ /^select/) or
 	    (lc($statement) =~ /^insert/) or
 	    (lc($statement) =~ /^update/) or
 	    (lc($statement) =~ /^delete/)
@@ -124,14 +135,8 @@ DBD::Ingres - DBI driver for Ingres database systems
 	    my $cnt = 0;
 	    foreach (@params) {
 		++$cnt;
-		if ( ! defined ) {
-		    #Null value to be binded... bind_param expects datatype - but what?
-		    $sth->bind_param($cnt, $_, { TYPE => DBI::SQL_VARCHAR }); #good as any guess?
-		 }
-		else {
-        	    if ( length() <= 32000 ) {	$sth->bind_param($cnt, $_); }
-		    else { $sth->bind_param($cnt, $_, { TYPE => DBI::SQL_LONGVARCHAR }); }
-		}
+		if ( defined) {	$sth->bind_param($cnt, $_); }
+		else {	$sth->bind_param($cnt, $_, { TYPE => DBI::SQL_VARCHAR }); } #dummy type, not used
 	    }
 	    my $numrows = $sth->execute() or return undef;
 	    $sth->finish;
@@ -165,19 +170,63 @@ DBD::Ingres - DBI driver for Ingres database systems
     }
 
     sub table_info {
-        my ($dbh) = @_;
-        my $sth = $dbh->prepare("
-	  SELECT VARCHAR(null) AS TABLE_CAT, table_owner AS TABLE_SCHEM,	                 table_name, 'TABLE' AS TABLE_TYPE
-	  FROM IITABLES
-	  WHERE table_type='T'
-          UNION
-          SELECT null, table_owner, table_name, 'VIEW'
-          FROM IITABLES
-          WHERE table_type ='V'");
+        my ($dbh, $catalog, $schema, $table, $type) = @_;
+	$schema = ($schema) ? $schema : q/%/;
+	$table = ($table) ? $table : q/%/;
+	my $sth = $dbh->prepare("
+	  SELECT VARCHAR(null) AS TABLE_CAT, table_owner AS TABLE_SCHEM, table_name, 'TABLE' AS TABLE_TYPE
+	  FROM iitables WHERE table_type='T' AND VARCHAR(table_owner) LIKE '$schema' AND VARCHAR(table_name) LIKE '$table'");
+#        my $sth = $dbh->prepare("
+#	  SELECT VARCHAR(null) AS TABLE_CAT, table_owner AS TABLE_SCHEM,	                 table_name, 'TABLE' AS TABLE_TYPE
+#	  FROM IITABLES
+#	  WHERE table_type='T'
+#          UNION
+#          SELECT null, table_owner, table_name, 'VIEW'
+#          FROM IITABLES
+#          WHERE table_type ='V'");
         return unless $sth;
         $sth->execute;
         $sth;
     }
+
+    sub column_info {
+        my ($dbh, $catalog, $schema, $table, $column) = @_;
+	$schema = ($schema) ? $schema : q/%/;
+	$table = ($table) ? $table : q/%/;
+	$column = ($column) ? $column : q/%/;
+	my $sth = $dbh->prepare("
+	  SELECT VARCHAR(null) AS TABLE_CAT, table_owner AS TABLE_SCHEM, table_name AS TABLE_NAME, column_name AS COLUMN_NAME,
+	  column_ingdatatype AS DATA_TYPE, column_datatype AS TYPE_NAME, column_length AS COLUMN_SIZE, INT(0) AS BUFFER_LENGTH,
+	  column_scale AS DECIMAL_DIGITS, INT(0) AS NUM_PREC_RADIX, column_nulls AS NULLABLE, VARCHAR('') AS REMARKS,
+	  column_default_val AS COLUMN_DEF, column_datatype AS SQL_DATA_TYPE, VARCHAR(null) AS SQL_DATETIME_SUB,
+	  INT(0) AS CHAR_OCTET_LENGTH, column_sequence AS ORDINAL_POSITION, column_nulls as IS_NULLABLE
+	  FROM iicolumns
+	  WHERE VARCHAR(table_owner) LIKE '$schema' AND VARCHAR(table_name) LIKE '$table' AND VARCHAR(column_name) LIKE '$column'
+	  ORDER BY table_owner, table_name, column_sequence");
+        return unless $sth;
+        $sth->execute;
+        $sth;
+    }
+
+    sub get_info {
+        my ($dbh, $ident) = @_;
+	my $info = '';
+	return unless $ident;
+	if ($ident == 17 ) { return "Ingres"; }
+	elsif ($ident == 18) { $info = "_version"; }
+	elsif ($ident == 29) { return "'"; }
+	elsif ($ident == 41) { return "."; }
+	else { return; }
+	my $sth = $dbh->prepare("SELECT dbmsinfo('$info')");
+        return unless $sth;
+        $sth->execute;
+	my $version = $sth->fetchrow;
+	if ($version =~ /II 9\.2\.0/) { return "2006 R3"; }
+	elsif ($version =~ /II 9\.1\.0/) { return "2006 R2"; }
+	else { return "unknown (implement more)";}
+#	return $version;
+    }
+
 
     sub ping {
         my($dbh) = @_;
@@ -380,11 +429,11 @@ See F<t/event.t> for an example of usage.
 =head2 do
 
 $dbh->do is implemented as a call to 'EXECUTE IMMEDIATE' with all the
-limitations that this implies. (with v0.52 SREAGLE did a workaround
-which does a call to "PREPARE" and a subsequent "EXECUTE" on perl-base)
-
-Placeholders and binding are not supported with C<$dbh-E<gt>do>.
-(with the workaround they are... SREAGLE)
+limitations that this implies. An exception to that are the DML statements
+C<INSERT>, C<DELETE> and C<UPDATE>. For them, a call to C<PREPARE> is
+made, possible existing parameters are bound and a subsequent C<EXECUTE>
+does the job. C<SELECT> isn't supported since $dbh->do doesn't give back
+a statement handler hence no way to retrieve data.
 
 =head2 Binary Data
 
@@ -639,6 +688,22 @@ C<$sth-E<gt>{NULLABLE}>.
 
 See also the C$sth-E<gt>{TYPE}> field in the DBI docs.
 
+=head2 ing_ph_ingtypes
+
+    $sth->{ing_ph_ingtypes}           (\@)
+    
+Returns an array containing the Ingres types of the columns the place-
+holders represent. This is a guess from the context of the placeholder
+in the prepared statement. Be aware, that the guess isn't always correct
+and sometypes a zero (illegal) type is returned. Plus negative values
+indicate nullability of the parameter. A C<$sth-E<gt>{ing_ph_nullable}>
+field is to be implemented yet.
+
+=head2 ing_ph_inglengths              (\@)
+
+Returns an array containing the lengths of the placeholders analog to
+the $sth->{ing_lengths} field.
+
 =head1 FEATURES NOT IMPLEMENTED
 
 =head2 state
@@ -682,14 +747,14 @@ Until that is defined procedure calls can be implemented as a
 DB::Ingres-specific function (like L<get_event>) if the need arises and
 someone is willing to do it.
 
-=head2 OpenIngres new features
-
-Some new features of OpenIngres are not (yet) supported in DBD::Ingres,
-including spatial datatypes.
-
-Support will be added when the need arises - if you need it you add it ;-)
-
 =head1 NOTES
+
+=head2 $dbh->(table|column|get)_info
+
+The table_info and column_info functions are just working against tables.
+Views and synonyms still have to be implemented. The get_info function
+returns just the newer version strings correctly, since I'm still looking
+ for documentation for the older ones.
 
 I wonder if I have forgotten something?
 
@@ -704,5 +769,8 @@ developed the DBD::Oracle that is the closest we have to a generic DBD
 implementation.
 
 Henrik Tougaard, <htoug@cpan.org> developed the DBD::Ingres extension.
+
+Stefan Reddig, <sreagle@cpan.org> is currently (2008) adopting it to
+include some more features.
 
 =cut
