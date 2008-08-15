@@ -741,9 +741,9 @@ dbd_st_prepare(sth, imp_sth, statement, attribs)
           
           for (param_no=0; param_no < param_max; param_no++) {
             var = &imp_sth->ph_sqlda.sqlvar[param_no];
-	    Renew(var->sqltype,1,short);
-            Renew(var->sqldata,1,char);
-            Renew(var->sqllen,1,short);
+/*	    Newx(var->sqltype,1,short);*/
+            Newx(var->sqldata,1,char);
+/*            Newx(var->sqllen,1,unsigned short);*/
           }
         }
         EXEC SQL DESCRIBE INPUT :name USING DESCRIPTOR sqlda;
@@ -752,7 +752,7 @@ dbd_st_prepare(sth, imp_sth, statement, attribs)
     }
 
     if (dbis->debug >= 2)
-        printf("DBD::Ingres::dbd_st_prepare: fields: %d, phs: %d\n",
+        PerlIO_printf(DBILOGFP,"DBD::Ingres::dbd_st_prepare: fields: %d, phs: %d\n",
                 DBIc_NUM_FIELDS(imp_sth), DBIc_NUM_PARAMS(imp_sth));
 
     imp_sth->trans_no = imp_dbh->trans_no;
@@ -767,11 +767,16 @@ dbd_get_handler(imp_fbh_t *fbh)
 {
 EXEC SQL BEGIN DECLARE SECTION;
     int data_end;
-    long size_read;
+    unsigned long size_read;
     char buf[HANDLER_READ_SIZE];
     long max_to_read = sizeof(buf);
 EXEC SQL END DECLARE SECTION;
+#ifndef __LP64__
     STRLEN offset, data_len, trunc_len;
+#else
+    U32 offset, data_len, trunc_len;
+    STRLEN d;
+#endif
     char *data;
     D_imp_sth(fbh->sth);
 
@@ -792,6 +797,7 @@ EXEC SQL END DECLARE SECTION;
      * Settings: 0=good, 1=truncated, -1=null */
     fbh->indic = 0;
     offset = 0;
+    data_len = 0;
 
     do {
         /* You must call GET DATA at least once no matter what. */
@@ -806,7 +812,11 @@ EXEC SQL END DECLARE SECTION;
             return 0;
         }
 
+#ifndef __LP64__
         if (offset + size_read > trunc_len) {
+#else
+        if (offset + (U32)size_read > trunc_len) {
+#endif
             /* we've read the maximum, time to truncate. */
             size_read = trunc_len - offset;
             fbh->indic = 1;
@@ -820,6 +830,7 @@ EXEC SQL END DECLARE SECTION;
          * Obviously for long data types that isn't a good idea. */
         data = SvGROW(fbh->sv, offset + size_read + 1);
 #else
+#ifndef __LP64__
         data = SvPV(fbh->sv, data_len);
         if (data_len < offset + size_read + 1) {
             data = SvPVX(fbh->sv);
@@ -830,10 +841,28 @@ EXEC SQL END DECLARE SECTION;
             Renew(data, data_len, char);
             SvPV_set(fbh->sv, data);
             SvLEN_set(fbh->sv, data_len);
+#else
+	d = (STRLEN)data_len;
+        data = SvPV(fbh->sv, d);
+        if (data_len < offset + (U32)size_read + 1) {
+            data = SvPVX(fbh->sv);
+            data_len = offset + (U32)size_read + 1;
+	    d = (STRLEN)data_len;
+            Renew(data, d, char);
+            SvPV_set(fbh->sv, data);
+            SvLEN_set(fbh->sv, d);
+#endif
         }
 #endif
+
+#ifndef __LP64__
         memcpy(data + offset, buf, size_read);
         offset += size_read;
+#else
+        memcpy(data + offset, buf, (U32)size_read);
+        offset += (U32)size_read;
+#endif
+
     } while (data_end == 0);
 
     /* Terminating with an extra null byte doesn't hurt binary data
@@ -1352,7 +1381,13 @@ dbd_st_fetch(sth, imp_sth)
     }
     set_session(DBIc_PARENT_H(imp_sth));
     sqlda = &imp_sth->sqlda;
+    if (dbis->debug >= 5)
+        PerlIO_printf(DBILOGFP,
+            "DBD::Ingres::dbd_st_fetch SRE before SQL FETCH\n");
     EXEC SQL FETCH :name USING DESCRIPTOR :sqlda;
+    if (dbis->debug >= 5)
+        PerlIO_printf(DBILOGFP,
+            "DBD::Ingres::dbd_st_fetch SRE after SQL FETCH\n");
     if (sqlca.sqlcode == 100) {
         dbd_st_finish(sth, imp_sth);
         return Nullav;

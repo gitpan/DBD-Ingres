@@ -93,11 +93,26 @@ ok(0, $null eq '0:1',
 ok(0, $cursor->{TYPE}[0] == SQL_INTEGER,
      "Column TYPE",
      "should be '".SQL_INTEGER."' is '$cursor->{TYPE}[0]'");
-# Possibly needs test on ing_type, ing_ingtype, ing_lengths..
+
+# test on ing_type, ing_ingtypes, ing_lengths..
+my $ingtypes=$cursor->{ing_type};
+ok(0, scalar @{$ingtypes} == 2, "Special Ingres attribute 'ing_type'","wrong number of parameters");
+my $ingingtypes=$cursor->{ing_ingtypes};
+ok(0, scalar @{$ingingtypes} == 2, "Special Ingres attribute 'ing_ingtypes'","wrong number of parameters");
+my $inglengths=$cursor->{ing_lengths};
+ok(0, scalar @{$inglengths} == 2, "Special Ingres attribute 'ing_lengths'","wrong number of parameters");
+
+# test on ing_ph_ingtypes, ing_ph_inglengths
+ok(0, $sth = $dbh->prepare("INSERT INTO $testtable(id, name) VALUES(?, ?)"),
+     "Prepare(insert with ?)", 1);
+my $ingphtypes=$cursor->{ing_ph_ingtypes};
+ok(0, scalar @{$ingtypes} == 2, "Special Ingres attribute 'ing_ph_ingtypes'","wrong number of parameters");
+my $ingphlengths=$cursor->{ing_ph_inglengths};
+ok(0, scalar @{$ingingtypes} == 2, "Special Ingres attribute 'ing_ph_inglengths'","wrong number of parameters");
 
 
 ok(0, $sth = $dbh->prepare("INSERT INTO $testtable(id, name) VALUES(?, ?)"),
-     "Prepare(insert with ?)", 1);
+     "Prepare(insert with ?) (again...)", 1);
 ok(0, $sth->bind_param(1, 1, {TYPE => SQL_INTEGER}),
      "Bind param 1 as 1", 1);
 ok(0, $sth->bind_param(2, "Henrik Tougaard", {TYPE => SQL_CHAR}),
@@ -230,6 +245,23 @@ $row = $cursor->fetchrow_arrayref;
 ok(0, ${$row}[0] eq "\0\1\2\3\0\1\2\3\0\1\2\3", "Binary data fetch", 1);
 $cursor->finish;
 
+#*_info
+use DBI::Const::GetInfoType;
+ok(0, $dbh->get_info($GetInfoType{SQL_DBMS_NAME}) eq "Ingres", "get_info(DBMS name)", 1);
+$sth = $dbh->table_info('','',$testtable);
+my $href = $sth->fetchrow_hashref;
+ok (0, ${$href}{table_name} eq $testtable, "table_info($testtable)", 1);
+$sth = $dbh->table_info('','',"%".substr($testtable,2,4)."%");
+$href = $sth->fetchrow_hashref;
+ok (0, ${$href}{table_name} eq $testtable, "table_info(Wildcards)", 1);
+$sth = $dbh->column_info('','',$testtable,"bin");
+$href = $sth->fetchrow_hashref;
+ok (0, ${$href}{type_name} eq "BYTE VARYING", "column_info(type name)", 1);
+$sth = $dbh->column_info('','',$testtable,"bin");
+$href = $sth->fetchrow_hashref;
+ok (0, ${$href}{column_size} == 64, "column_info(column size)", 1);
+$sth->finish;
+
 ok(0, $dbh->do( "DROP TABLE $testtable" ), "Dropping table", 1);
 ok(0, $dbh->rollback, "Rolling back", 1);
 #   What else??
@@ -252,5 +284,5 @@ $dbh and $dbh->disconnect;
 #   test of outerjoin and nullability
 #   what else?
 
-BEGIN { $num_test = 66; }
+BEGIN { $num_test = 77; }
 

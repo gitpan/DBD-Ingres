@@ -223,6 +223,7 @@ DBD::Ingres - DBI driver for Ingres database systems
 	my $version = $sth->fetchrow;
 	if ($version =~ /II 9\.2\.0/) { return "2006 R3"; }
 	elsif ($version =~ /II 9\.1\.0/) { return "2006 R2"; }
+	elsif ($version =~ /II 9\.0\.4/) { return "2006"; }
 	else { return "unknown (implement more)";}
 #	return $version;
     }
@@ -254,43 +255,39 @@ DBD::Ingres - DBI driver for Ingres database systems
                 LOCAL_TYPE_NAME => 12,
                 MINIMUM_SCALE   => 13,
                 MAXIMUM_SCALE   => 14,
+		# additional and renamed keys:
+		COLUMN_SIZE	=> 2,
+		FIXED_PREC_SCALE=> 10,
+		AUTO_UNIQUE_VALUE=> 11,
+		SQL_DATA_TYPE	=> 15,
+		SQL_DATETIME_SUB=> 16,
+		NUM_PREC_RADIX	=> 17,
+		INTERVAL_PRECISIO=> 18,
     	    },
     	    [ 'SMALLINT',     DBI::SQL_SMALLINT,
-	      undef, "","",  undef,
-    	      1, 0, 2, 0, 0, 0, undef, 0, 0 ],
+	      undef, "","",  undef, 1, 0, 2, 0, 0, 0, undef, 0, 0 ],
     	    [ 'INTEGER',      DBI::SQL_INTEGER,
-	      undef, "","",   "size=1,2,4",
-    	      1, 0, 2, 0, 0 ,0 ,undef ,0 ,0 ],
+	      undef, "","", "size=1,2,4", 1, 0, 2, 0, 0 ,0 ,undef ,0 ,0 ],
     	    [ 'MONEY',        DBI::SQL_DECIMAL,
-	      undef, "","",   undef,
-    	      1, 0, 2, 0, 1, 0, undef, 0, 0 ],
+	      undef, "","",  undef, 1, 0, 2, 0, 1, 0, undef, 0, 0 ],
     	    [ 'FLOAT',        DBI::SQL_DOUBLE,
-	      undef, "","",   "size=4,8",
-    	      1, 0, 2, 0, 0, 0, undef, 0, 0 ],
+	      undef, "","", "size=4,8", 1, 0, 2, 0, 0, 0, undef, 0, 0 ],
     	    [ 'DATE',         DBI::SQL_DATE,   
-	      undef, "'","'", undef,
-    	      1, 0, 3, 0, 0, 0, undef, 0, 0 ],
+	      undef, "'","'", undef, 1, 0, 3, 0, 0, 0, undef, 0, 0 ],
     	    [ 'DECIMAL',      DBI::SQL_DECIMAL,
-	      undef, "","",   "precision,scale",
-    	      1, 0, 2, 0, 0, 0, undef, 0, 0 ],
+	      undef, "","", "precision,scale", 1, 0, 2, 0, 0, 0, undef, 0, 0 ],
     	    [ 'VARCHAR',      DBI::SQL_VARCHAR,
-	      undef, "'","'", "max length",
-    	      1, 1, 3, 0, 0, 0, undef, 0, 0 ],
+	      undef, "'","'", "max length", 1, 1, 3, 0, 0, 0, undef, 0, 0 ],
     	    [ 'BYTE VARYING', DBI::SQL_VARBINARY,
-	      undef, "'","'", "max length",
-    	      1, 1, 3, 0, 0, 0, undef, 0, 0 ],
+	      undef, "'","'", "max length", 1, 1, 3, 0, 0, 0, undef, 0, 0 ],
     	    [ 'CHAR',         DBI::SQL_CHAR,   
-	      undef, "'","'", "length",
-    	      1, 1, 3, 0, 0, 0, undef, 0, 0 ],
+	      undef, "'","'", "length", 1, 1, 3, 0, 0, 0, undef, 0, 0 ],
     	    [ 'BYTE',         DBI::SQL_BINARY, 
-	      undef, "'","'", "length",
-    	      1, 1, 3, 0, 0, 0, undef, 0, 0 ],
+	      undef, "'","'", "length", 1, 1, 3, 0, 0, 0, undef, 0, 0 ],
     	    [ 'LONG VARCHAR', DBI::SQL_LONGVARCHAR, 
-	      undef, undef, undef, undef,
-    	      1, 1, 0, 0, 0, 0, undef, 0, 0 ],
+	      undef, undef, undef, undef, 1, 1, 0, 0, 0, 0, undef, 0, 0 ],
     	    [ 'LONG BYTE', DBI::SQL_LONGVARBINARY, 
-	      undef, undef, undef, undef,
-    	      1, 1, 0, 0, 0, 0, undef, 0, 0 ],
+	      undef, undef, undef, undef, 1, 1, 0, 0, 0, 0, undef, 0, 0 ],
     	];
     	return $ti;
     }
@@ -699,7 +696,9 @@ and sometypes a zero (illegal) type is returned. Plus negative values
 indicate nullability of the parameter. A C<$sth-E<gt>{ing_ph_nullable}>
 field is to be implemented yet.
 
-=head2 ing_ph_inglengths              (\@)
+=head2 ing_ph_inglengths
+
+    $sth->{ing_ph_inglengths}         (\@)
 
 Returns an array containing the lengths of the placeholders analog to
 the $sth->{ing_lengths} field.
