@@ -245,9 +245,11 @@ $row = $cursor->fetchrow_arrayref;
 ok(0, ${$row}[0] eq "\0\1\2\3\0\1\2\3\0\1\2\3", "Binary data fetch", 1);
 $cursor->finish;
 
-#*_info
+#get_info
 use DBI::Const::GetInfoType;
 ok(0, $dbh->get_info($GetInfoType{SQL_DBMS_NAME}) eq "Ingres", "get_info(DBMS name)", 1);
+
+#table_info
 $sth = $dbh->table_info('','',$testtable);
 my $href = $sth->fetchrow_hashref;
 ok (0, ${$href}{table_name} eq $testtable, "table_info($testtable)", 1);
@@ -256,10 +258,17 @@ $href = $sth->fetchrow_hashref;
 ok (0, ${$href}{table_name} eq $testtable, "table_info(Wildcards)", 1);
 $sth = $dbh->column_info('','',$testtable,"bin");
 $href = $sth->fetchrow_hashref;
+
+#column_info
 ok (0, ${$href}{type_name} eq "BYTE VARYING", "column_info(type name)", 1);
 $sth = $dbh->column_info('','',$testtable,"bin");
 $href = $sth->fetchrow_hashref;
 ok (0, ${$href}{column_size} == 64, "column_info(column size)", 1);
+
+#type_info
+# number of supported datatypes (supported by type_info, that means)
+my @type_info = $dbh->type_info(DBI::SQL_ALL_TYPES);
+ok (0, @type_info == 12, "type_info(count)", 1);
 $sth->finish;
 
 ok(0, $dbh->do( "DROP TABLE $testtable" ), "Dropping table", 1);
@@ -284,5 +293,5 @@ $dbh and $dbh->disconnect;
 #   test of outerjoin and nullability
 #   what else?
 
-BEGIN { $num_test = 77; }
+BEGIN { $num_test = 78; }
 
