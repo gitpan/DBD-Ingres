@@ -1,3 +1,6 @@
+v0.53     2009.09.30
+ - changed behavior of ing_rollback - see perldoc
+ - fix outdated internal connect routines to work when using password
 v0.52     2008.08.28
  - add missing timestamp types
  - add support for placeholders in INSERT, DELETE, UPDATE with do statements

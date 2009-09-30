@@ -34,7 +34,7 @@ DBD::Ingres - DBI driver for Ingres database systems
     use DynaLoader ();
     @ISA = qw(DynaLoader);
 
-    $VERSION = '0.52';
+    $VERSION = '0.53';
     my $Revision = substr(q$Change: 18308 $, 8)/100;
 
     bootstrap DBD::Ingres $VERSION;
@@ -221,10 +221,11 @@ DBD::Ingres - DBI driver for Ingres database systems
         return unless $sth;
         $sth->execute;
 	my $version = $sth->fetchrow;
-	if ($version =~ /II 9\.2\.0/) { return "2006 R3"; }
+	if ($version =~ /II 9\.3\.0/) { return "9.3"; }
+	elsif ($version =~ /II 9\.2\.0/) { return "2006 R3"; }
 	elsif ($version =~ /II 9\.1\.0/) { return "2006 R2"; }
 	elsif ($version =~ /II 9\.0\.4/) { return "2006"; }
-	else { return "unknown (implement more)";}
+	else { return "unknown";}
 #	return $version;
     }
 
@@ -354,10 +355,10 @@ and so on.
 =head2 AutoCommit Defaults to ON
 
 B<Important>: The DBI spec defines that AutoCommit is B<ON> after connect.
-This is the opposite of the normal Ingres default.
+This is the opposite of the normal Ingres default (autocommit B<OFF>).
 
-It is recommended that the C<connect> call ends with the attributes
-C<{ AutoCommit =E<gt> 0 }>.
+To reflect this behavior in your code, it is recommended that the
+C<connect> call ends with the attributes C<{ AutoCommit =E<gt> 0 }>.
 
 =head2 Returned Types
 
@@ -469,9 +470,8 @@ you don't pass them as references.)
 
 =head2 ing_readonly
 
-Normally cursors are declared C<READONLY> 
-to increase speed. READONLY cursors don't create
-exclusive locks for all the rows selected; this is
+Normally cursors are declared C<READONLY> to increase speed. READONLY
+cursors don't create exclusive locks for all the rows selected; this is
 the default.
 
 If you need to update a row then you will need to ensure that either
@@ -482,9 +482,10 @@ If you need to update a row then you will need to ensure that either
 
 the C<select> statement contains an C<for update of> clause, or
 
-= item *
+=item *
 
-the C<$dbh-E<gt>prepare> calls includes the attribute C<{ing_readonly =E<gt> 0}>.
+the C<$dbh-E<gt>prepare> calls includes the attribute
+C<{ing_readonly =E<gt> 0}>.
 
 =back
 
@@ -541,6 +542,19 @@ Setting ing_rollback to B<on> will change that to 'Changing C<AutoCommit>
 from off to on will trigger a C<rollback>'.
 
 Default value is B<off>.
+
+B<NOTE> Since DBD::Ingres version 0.53 ing_rollback has also an impact
+on the behavior on C<disconnect> . Earlier versions always did a
+C<rollback>, when disconnecting while a transaction was active. Now
+despite the state of C<AutoCommit> the action (rollback/commit) is
+determined on the state of C<ing_rollback>. If it's on, a rollback is
+done, otherwise a commit takes place. So if C<AutoCommit> is off, and
+you disconnect without commiting, all your work would be treated like
+one big transaction.
+
+Please take that in mind: This is just due to compatibility to other
+databases. Correct would be a C<commit> at the end of the transaction,
+before disconnecting...
 
 =head2 ing_statement
 
@@ -679,18 +693,18 @@ are given as documented in the Ingres SQL Reference Manual.
 All values are positive as the nullability of the field is returned in
 C<$sth-E<gt>{NULLABLE}>.
 
-See also the C$sth-E<gt>{TYPE}> field in the DBI docs.
+See also the C<$sth-E<gt>{TYPE}> field in the DBI docs.
 
 =head2 ing_ph_ingtypes
 
     $sth->{ing_ph_ingtypes}           (\@)
     
-Returns an array containing the Ingres types of the columns the place-
-holders represent. This is a guess from the context of the placeholder
-in the prepared statement. Be aware, that the guess isn't always correct
-and sometypes a zero (illegal) type is returned. Plus negative values
-indicate nullability of the parameter. A C<$sth-E<gt>{ing_ph_nullable}>
-field is to be implemented yet.
+Returns an array containing the Ingres types of the columns the
+placeholders represent. This is a guess from the context of the
+placeholder in the prepared statement. Be aware, that the guess
+isn't always correct and sometypes a zero (illegal) type is returned.
+Plus negative values indicate nullability of the parameter.
+A C<$sth-E<gt>{ing_ph_nullable}> field is to be implemented yet.
 
 =head2 ing_ph_inglengths
 
@@ -744,12 +758,12 @@ someone is willing to do it.
 
 =head1 NOTES
 
-=head2 $dbh->(table|column|get)_info
+=head2 $dbh->table_info, $dbh->column_info, $dbh->get_info 
 
 The table_info and column_info functions are just working against tables.
 Views and synonyms still have to be implemented. The get_info function
 returns just the newer version strings correctly, since I'm still looking
- for documentation for the older ones.
+for documentation for the older ones.
 
 I wonder if I have forgotten something?
 

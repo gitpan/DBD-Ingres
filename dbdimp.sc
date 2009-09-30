@@ -278,14 +278,8 @@ dbd_db_login(dbh, imp_dbh, dbname, user, pass)
         if (dbis->debug >= 3) PerlIO_printf(DBILOGFP, "    user='%s', opt='%s'\n",
                                 user, opt);
         if (pass && *pass) {
-/*OI*       EXEC SQL CONNECT :dbname SESSION :session
-                 IDENTIFIED BY :user DBMS_PASSWORD=:pass OPTIONS=:opt;
-/**/
-/*64*
-            warn("DBD::Ingres::connect non-OpenIngres: ignoring DBMS_PASSWORD");
             EXEC SQL CONNECT :dbname SESSION :session
-                 IDENTIFIED BY :user OPTIONS=:opt;
-/**/
+                 IDENTIFIED BY :user DBMS_PASSWORD=:pass OPTIONS=:opt;
         } else {
             EXEC SQL CONNECT :dbname SESSION :session
                  IDENTIFIED BY :user OPTIONS=:opt;
@@ -473,12 +467,17 @@ dbd_db_disconnect(dbh, imp_dbh)
     set_session(dbh);
     EXEC SQL INQUIRE_INGRES(:transaction_active = TRANSACTION);
     if (transaction_active == 1){
-        warn("DBD::Ingres: You should commit or rollback before disconnect.");
-        EXEC SQL ROLLBACK;
-        if (sqlca.sqlcode != 0) {
-            warn("DBD::Ingres: problem rolling back: SQLCODE: %d", sqlca.sqlcode);
+	if (imp_dbh->ing_rollback == 1) {
+            EXEC SQL ROLLBACK;
+            if (sqlca.sqlcode != 0) {
+                warn("DBD::Ingres: problem rolling back: SQLCODE: %d", sqlca.sqlcode);
+	    }
+	} else {
+            EXEC SQL COMMIT;
+            if (sqlca.sqlcode != 0) {
+                warn("DBD::Ingres: problem commiting: SQLCODE: %d", sqlca.sqlcode);
+	    }
         }
-        warn("DBD::Ingres: Any outstanding changes have been rolledback.");
     }
     EXEC SQL DISCONNECT;
     /* We assume that disconnect will always work       */
@@ -741,14 +740,12 @@ dbd_st_prepare(sth, imp_sth, statement, attribs)
           
           for (param_no=0; param_no < param_max; param_no++) {
             var = &imp_sth->ph_sqlda.sqlvar[param_no];
-/*	    Newx(var->sqltype,1,short);*/
             Newx(var->sqldata,1,char);
-/*            Newx(var->sqllen,1,unsigned short);*/
           }
         }
         EXEC SQL DESCRIBE INPUT :name USING DESCRIPTOR sqlda;
 	
-	//TODO: fill "ing_ph_type(s)","ing_ph_lengths", check for unknown types
+	//SRE TODO: check for unknown types
     }
 
     if (dbis->debug >= 2)

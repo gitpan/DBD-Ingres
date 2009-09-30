@@ -29,7 +29,7 @@ my %opts = (
 	       COMPRESS => 'gzip', SUFFIX => 'gz', },
     LINKTYPE => 'dynamic',
     OPTIMIZE => '-g',
-   ($] >= 5.005)
+   ($] >= 5.6)
     ? (
      'AUTHOR' => 'Henrik Tougaard (htoug@cpan.org)',
      'ABSTRACT_FROM' => 'Ingres.pm',
@@ -41,13 +41,11 @@ $opts{CAPI} = 'TRUE' if $Config{archname} =~ /-object\b/i;
 # Options, typically only used for debugging
 $::opt_g = '';		# enable debugging (s/-O/-g/g)
 $::opt_v = 0;		# be verbose
-$::opt_o = 0;           # OpenIngres or not
 
-GetOptions('v!', 'g!', 'o!') or die "Invalid arguments";
+GetOptions('v!', 'g!') or die "Invalid arguments";
 
 $::opt_g &&= '-g';	# convert to actual string
 $Verbose ||= $::opt_v;
-my $OpenIngres= $::opt_o;
 
 # --- Introduction
 
@@ -69,7 +67,7 @@ my $II_SYSTEM = $ENV{II_SYSTEM};
 print "Using Ingres in $II_SYSTEM\n";
 
 my $libhome = "";
-my $linkwith = "-L$II_SYSTEM/ingres/lib -lingres";  # good (?) guess for 6.4
+my $linkwith = "-L$II_SYSTEM/ingres/lib -lingres";  # standard path for lib
 if (-f "$II_SYSTEM/ingres/files/abflnk.opt") {
     # the option file should give us all the libraries we need
     open(ABFLNK, "$II_SYSTEM/ingres/files/abflnk.opt")
@@ -80,18 +78,20 @@ if (-f "$II_SYSTEM/ingres/files/abflnk.opt") {
     $linkwith =~ s/\n//g;
     $linkwith =~ s/\$II_SYSTEM/$II_SYSTEM/g;
 } elsif (-f "$II_SYSTEM/ingres/lib/libcompat.1.so") {
-    $linkwith .= " -lcompat.1";   # OpenIngres without ABF.
-}
-# Adjust linkwith (some 6.4 versions have the name of the library in abfopt.opt
-for ($linkwith) {
-   s{(/.*)/lib(.*?)\.a}{-L$1 -l$2};
+    $linkwith .= " -lcompat.1";   # was OpenIngres option - no longer needed?
 }
 
-# Try to figure out if this is an OpenIngres or not
-unless (defined $OpenIngres) {
-    $OpenIngres = defined(-f "$II_SYSTEM/ingres/lib/libcompat.1.so");
-    print "OpenIngres detected\n" if $OpenIngres;
-}
+# no longer needed?
+# Adjust linkwith (some 6.4 versions have the name of the library in abfopt.opt
+#for ($linkwith) {
+#   s{(/.*)/lib(.*?)\.a}{-L$1 -l$2};
+#}
+
+# (obsolete)Try to figure out if this is an OpenIngres or not 
+#unless (defined $OpenIngres) {
+#    $OpenIngres = defined(-f "$II_SYSTEM/ingres/lib/libcompat.1.so");
+#    print "OpenIngres detected\n" if $OpenIngres;
+#}
 
 
 my $linkopt = "";
@@ -116,7 +116,7 @@ if ($Is_VMS) {
     $linkwith = "";
     $libhome = "";
     $ESQLC = "ESQLC";
-    $OpenIngres = -r "II_SYSTEM:[INGRES.FILES]CONFIG.DAT";
+    #$OpenIngres = -r "II_SYSTEM:[INGRES.FILES]CONFIG.DAT"; #(obsolete)
 } elsif ($Is_NT) {
     $ESQLC = $ENV{ESQLC} ||"$II_SYSTEM\\ingres\\bin\\esqlc.exe";
 } else {
@@ -144,10 +144,12 @@ print "System: perl$] @Config{qw(myuname)}\n",
       "Compiler: @Config{qw(cc optimize ccflags)}\n",
       "SQL-precompiler: $ESQLC\n",
       "II_SYSTEM: $II_SYSTEM",
-	  ($OpenIngres ? ", OpenIngres\n" : "Ingres 6.4\n"),
       "Linkwith: '$linkwith'\n" if $Verbose;
 
 print "\n";
+
+#SRE: just for a strange clock_gettime error I get
+$linkwith .= " -lrt";
 
 $opts{LIBS} = [ "$libhome $linkwith" ];
 
@@ -174,25 +176,26 @@ $opts{OBJECT} = 'Ingres$(OBJ_EXT) dbdimp$(OBJ_EXT)';
 $opts{depend} = { "dbdimp\$(OBJ_EXT)" => "dbdimp.c Ingres.h",
 		  "Ingres\$(OBJ_EXT)" => "Ingres.h",
                 };
-$opts{clean} = { FILES => "dbdimp.c dbdimp.sc Ingres.h Ingres.sc Ingres.xsi" };
+$opts{clean} = { FILES => "dbdimp.c Ingres.h Ingres.sc Ingres.xsi" };
 $opts{macro} = { ESQLC => $ESQLC, ESQLCOPT => "-o.h -w -p" };
-$opts{DEFINE} = '-DOPENINGRES' if $OpenIngres;
+#$opts{DEFINE} = '-DOPENINGRES' if $OpenIngres; #(obsolete)
 WriteMakefile(%opts);
 
 sub MY::post_initialize {
     my $self = shift;
-    # Ensure Ingperl.pm and ingperl.pl are installed into top lib dir
-    $self->{PM}->{'Ingperl.pm'} = '$(INST_LIB)/Ingperl.pm';
-    $self->{PM}->{'ingperl.pl'} = '$(INST_LIB)/ingperl.pl';
+    # (obsolete) Ensure Ingperl.pm and ingperl.pl are installed into top lib dir
+    # $self->{PM}->{'Ingperl.pm'} = '$(INST_LIB)/Ingperl.pm';
+    # $self->{PM}->{'ingperl.pl'} = '$(INST_LIB)/ingperl.pl';
     '';
 }
 
 sub MY::postamble {
     # Note this is not quite in accordance with the DBD-writer specs.
     # Mainly due to attempts to cater for 'wierd' DBI locations.
-    my $subst = $OpenIngres ?
-		    's!/\\*OI\\*!!' :    # Turn on OpenIngres or 
-		    's!/\\*64\\*!!';     # Ingres 6.4 parts of dbdimp.psc
+    # (obsolete)
+    #my $subst = $OpenIngres ?
+	#	    's!/\\*OI\\*!!' :    # Turn on OpenIngres or 
+	#	    's!/\\*64\\*!!';     # Ingres 6.4 parts of dbdimp.psc
 
     my $driver_xst_path = $DBIXS_INSTALL_DIR."/Driver.xst";
     if ($Is_VMS) {
@@ -203,9 +206,6 @@ sub MY::postamble {
     q[
 dbdimp.c Ingres.h : dbdimp.sc Ingres.sh
 	$(ESQLC) $(ESQLCOPT) dbdimp.sc 
-
-dbdimp.sc: dbdimp.psc
-	$(PERL) -p -e "].$subst.q[" dbdimp.psc > dbdimp.sc
 
 $(BASEEXT).xs: $(BASEEXT).xsi].($Is_VMS ? "\n\tcontinue" : "").q[
 

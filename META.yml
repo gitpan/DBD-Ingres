@@ -1,13 +1,14 @@
-# http://module-build.sourceforge.net/META-spec.html
-#XXXXXXX This is a prototype!!!  It will change in the future!!! XXXXX#
-name:         DBD-Ingres
-version:      0.52
-version_from: Ingres.pm
-installdirs:  site
-requires:
+--- #YAML:1.0
+name:                DBD-Ingres
+version:             0.53
+abstract:            ~
+license:             ~
+generated_by:        ExtUtils::MakeMaker version 6.36
+distribution_type:   module
+requires:     
     Config:                        0
     DBI:                           1
     Getopt::Long:                  0
-
-distribution_type: module
-generated_by: ExtUtils::MakeMaker version 6.30
+meta-spec:
+    url:     http://module-build.sourceforge.net/META-spec-v1.2.html
+    version: 1.2

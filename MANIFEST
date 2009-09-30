@@ -1,10 +1,7 @@
-dbdimp.psc
-Ingperl.pm
+dbdimp.sc
 Ingres.pm
 Ingres.sh
 Ingres.xs
-ingtest.pl
-ingperl.pl
 Makefile.PL
 MANIFEST
 t/datatypes.t

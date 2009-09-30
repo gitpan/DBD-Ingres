@@ -1,8 +1,11 @@
 DBD::Ingres --  an Ingres interface for Perl 5 using DBI.
 
 This is the Database Driver for the Ingres family of database products.
-It requires Ingres 6.4 or OpenIngres 1.0 or newer,
-DBI 1.00 or newer, Perl5.004 or newer.
+It requires Ingres 2006 (aka Ingres 9.0) or newer,
+DBI 1.00 or newer, Perl5.6 or newer.
+
+For older versions of Ingres please use version 0.51 of this driver,
+also available at CPAN.
 
    Copyright (c) 1996,1997,1998,1999,2000  Henrik Tougaard <htoug@cpan.org>
 
@@ -11,7 +14,7 @@ DBI 1.00 or newer, Perl5.004 or newer.
 
 BEFORE BUILDING, TESTING AND INSTALLING this you will need to:
 
-    Build, test and install Perl 5.004 (or newer)
+    Build, test and install Perl 5.6 (or newer)
     It is very important to test it and install it!
 
     Build, test and install the DBI module.
@@ -45,11 +48,6 @@ manipulate it and delete it again.
 It is important for the succes of the test that you have the neccesary
 Ingres permissions.
 
-The ingtest.pl script is a "quick" hack of the test for ingperl (the
-"old" perl4 interface).
-
-If it fails horribly, see below.
-
 Do NOT hand edit the generated Makefile unless you are completely sure
 you understand the implications! Always try to make changes via the
 Makefile.PL command line and/or editing the Makefile.PL.
@@ -74,7 +72,7 @@ KNOWN PROBLEMS:
 
         o the arguments to &sql(connect) must be given in the order:
             database-name username other-options
-          otherwise the check for username wil fail.
+          otherwise the check for username will fail.
 
 	o Problems have been reported on Digital Unix where the abflnk.opt
           files does not include '-ldnet_stub'. This will cause wierd errors
@@ -96,8 +94,6 @@ dlopen: Unresolved symbols at
 
 TO DO LIST:
 
-        o Add support for OpenIngres long datatypes.
-        o Add a way to call database procedures.
         o Add cached statements
         o Track the changes in the DBI spec
         o Verify that DBD::Ingres works under Apache::DBI (and make neccesary
@@ -113,6 +109,7 @@ pertinent documents at:
 If this does *not* resolve your problem, please post details to
 dbi-users@perl.org (to subscribe mail to dbi-users-help@perl.org)
 and CC them to me at htoug@cpan.org
+(since version 0.52 and later please contact sreagle@cpan.org instead)
 
 Please include:
 
@@ -143,3 +140,4 @@ Please include:
 Original document: (c)Tim Bunce
 Amendments: (c)Alligator Descartes
 Further amendments: (c)Henrik Tougaard <htoug@cpan.org>
+Latest amendments: (c)Stefan Reddig <sreagle@cpan.org>
